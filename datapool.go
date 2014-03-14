@@ -125,7 +125,7 @@ func (lg *LogGroup) getKeys(data []string) ([]dataPoint, time.Time) {
 				}
 			}
 
-			if val < 0 && lg.failOperationWarn {
+			if val < 0 && lg.fail_operation_warn {
 				log.Printf("Values cannot be negative after applying operation. Offending line: %s", data[0])
 				var nt time.Time
 				return nil, nt
@@ -139,7 +139,7 @@ func (lg *LogGroup) getKeys(data []string) ([]dataPoint, time.Time) {
 	return dataPoints, t
 }
 
-func getCounterKeys(name string, c metrics.Counter) []string {
+func getCounterKeys(name string, c timemetrics.Counter) []string {
 	t := int(c.GetMaxTime().Unix())
 
 	keys := make([]string, 1)
@@ -148,7 +148,7 @@ func getCounterKeys(name string, c metrics.Counter) []string {
 	return keys
 }
 
-func getMeterKeyCount(name string, m metrics.Meter) []string {
+func getMeterKeyCount(name string, m timemetrics.Meter) []string {
 	t := int(m.GetMaxTime().Unix())
 
 	keys := make([]string, 1)
@@ -157,7 +157,7 @@ func getMeterKeyCount(name string, m metrics.Meter) []string {
 	return keys
 }
 
-func getMeterKeyRates(name string, m metrics.Meter) []string {
+func getMeterKeyRates(name string, m timemetrics.Meter) []string {
 	t := int(m.GetMaxEWMATime().Unix())
 
 	keys := make([]string, 3)
@@ -169,7 +169,7 @@ func getMeterKeyRates(name string, m metrics.Meter) []string {
 	return keys
 }
 
-func getHistogramKeys(name string, h metrics.Histogram) []string {
+func getHistogramKeys(name string, h timemetrics.Histogram) []string {
 	t := int(h.GetMaxTime().Unix())
 	ps := h.Percentiles([]float64{0.5, 0.75, 0.95, 0.99, 0.999})
 
@@ -211,7 +211,7 @@ func (lg LogGroup) dataPoolHandler(channel_number int, tsd_pushers []chan []stri
 		lastNbKeys := 0
 		for {
 			select {
-			case data := <-lg.tailData[channel_number]:
+			case data := <-lg.tail_data[channel_number]:
 				data_points, point_time := lg.getKeys(data)
 
 				//To start things off
@@ -224,14 +224,14 @@ func (lg LogGroup) dataPoolHandler(channel_number int, tsd_pushers []chan []stri
 					if _, ok := dataPool[data_point.name]; !ok {
 						switch data_point.metric_type {
 						case "histogram":
-							s := metrics.NewExpDecaySample(point_time, lg.histogram_size, lg.histogram_alpha_decay, lg.histogram_rescale_threshold_min)
-							dataPool[data_point.name] = &tsdPoint{data: metrics.NewHistogram(s),
+							s := timemetrics.NewExpDecaySample(point_time, lg.histogram_size, lg.histogram_alpha_decay, lg.histogram_rescale_threshold_min)
+							dataPool[data_point.name] = &tsdPoint{data: timemetrics.NewHistogram(s),
 								lastPush: point_time}
 						case "counter":
-							dataPool[data_point.name] = &tsdPoint{data: metrics.NewCounter(point_time),
+							dataPool[data_point.name] = &tsdPoint{data: timemetrics.NewCounter(point_time),
 								lastPush: point_time}
 						case "meter":
-							dataPool[data_point.name] = &tsdPoint{data: metrics.NewMeter(point_time, lg.interval),
+							dataPool[data_point.name] = &tsdPoint{data: timemetrics.NewMeter(point_time, lg.interval),
 								lastPush: point_time, lastCrunchedPush: point_time}
 						default:
 							log.Fatalf("Unexpected metric type %s!", data_point.metric_type)
@@ -245,11 +245,11 @@ func (lg LogGroup) dataPoolHandler(channel_number int, tsd_pushers []chan []stri
 					}
 
 					switch d := dataPool[data_point.name].data.(type) {
-					case metrics.Histogram:
+					case timemetrics.Histogram:
 						d.Update(point_time, data_point.value)
-					case metrics.Counter:
+					case timemetrics.Counter:
 						d.Inc(point_time, data_point.value)
-					case metrics.Meter:
+					case timemetrics.Meter:
 						d.Mark(point_time, data_point.value)
 					}
 				}
@@ -261,7 +261,7 @@ func (lg LogGroup) dataPoolHandler(channel_number int, tsd_pushers []chan []stri
 					//Update EWMAs
 					for _, tsdPoint := range dataPool {
 						switch v := tsdPoint.data.(type) {
-						case metrics.Meter:
+						case timemetrics.Meter:
 							sec_since_last_value := point_time.Sub(v.GetMaxTime()).Seconds()
 							sec_since_last_ewma_crunch := point_time.Sub(v.GetMaxEWMATime()).Seconds()
 
@@ -280,7 +280,7 @@ func (lg LogGroup) dataPoolHandler(channel_number int, tsd_pushers []chan []stri
 				nbKeys := 0
 				for tsd_key, tsdPoint := range dataPool {
 					switch v := tsdPoint.data.(type) {
-					case metrics.Histogram:
+					case timemetrics.Histogram:
 						snap := v.Snapshot()
 
 						if snap.GetMaxTime().Unix() > tsdPoint.lastPush.Unix() { //Only push updated metrics
@@ -290,13 +290,13 @@ func (lg LogGroup) dataPoolHandler(channel_number int, tsd_pushers []chan []stri
 						}
 
 						nbKeys += 10
-					case metrics.Counter:
+					case timemetrics.Counter:
 						snap := v.Snapshot()
 						if snap.GetMaxTime().After(tsdPoint.lastPush) {
 							tsd_push <- getCounterKeys(tsd_key, snap)
 						}
 						nbKeys += 1
-					case metrics.Meter:
+					case timemetrics.Meter:
 						snap := v.Snapshot()
 
 						if snap.GetMaxTime().After(tsdPoint.lastPush) {

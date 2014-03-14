@@ -21,7 +21,7 @@ func tailFile(channel_number int, filename string, logGroup *LogGroup) {
 
 	//os.Seek end of file descriptor
 	seekParam := 2
-	if logGroup.parseFromStart {
+	if logGroup.parse_from_start {
 		seekParam = 0
 	}
 
@@ -46,8 +46,8 @@ func tailFile(channel_number int, filename string, logGroup *LogGroup) {
 			//Decide which datapool channel to send the line to
 			//split_val := logGroup.workload_split_on + 1
 
-			logGroup.tailData[channel_number] <- matches
-		} else if logGroup.failRegexWarn {
+			logGroup.tail_data[channel_number] <- matches
+		} else if logGroup.fail_regex_warn {
 			log.Printf("Regexp match failed on %s, expected %d matches, got %d: %s", filename, maxMatches, len(matches), line.Text)
 		}
 	}

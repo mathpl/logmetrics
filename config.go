@@ -20,6 +20,7 @@ type Config struct {
 	pushProto    string
 	pushType     string
 	pushNumber   int
+	stats_wait   int
 	logGroups    map[string]*LogGroup
 	logFacility  syslog.Priority
 }
@@ -56,12 +57,12 @@ type LogGroup struct {
 	workload_split_on int
 	interval          int
 
-	failOperationWarn bool
-	parseFromStart    bool
-	failRegexWarn     bool
+	fail_operation_warn bool
+	parse_from_start    bool
+	fail_regex_warn     bool
 
 	//Channels
-	tailData []chan []string
+	tail_data []chan []string
 
 	//Workvars
 	last_date_str string
@@ -181,6 +182,8 @@ func LoadConfig(configFile string) Config {
 				cfg.pushWait = v
 			case "push_number":
 				cfg.pushNumber = v
+			case "stats_wait":
+				cfg.stats_wait = v
 
 			default:
 				log.Fatalf("Unknown key settings.%s", key)
@@ -229,6 +232,9 @@ func LoadConfig(configFile string) Config {
 	}
 	if cfg.pushNumber == 0 {
 		cfg.pushNumber = 1
+	}
+	if cfg.stats_wait == 0 {
+		cfg.stats_wait = 60
 	}
 
 	//Log_groups configs
@@ -293,11 +299,11 @@ func LoadConfig(configFile string) Config {
 			case bool:
 				switch key {
 				case "warn_on_regex_fail":
-					lg.failRegexWarn = v
+					lg.fail_regex_warn = v
 				case "parse_from_start":
-					lg.parseFromStart = v
+					lg.parse_from_start = v
 				case "warn_on_operation_fail":
-					lg.failOperationWarn = v
+					lg.fail_operation_warn = v
 				default:
 					log.Fatalf("Unknown key %s.%s", name, key)
 				}
@@ -358,9 +364,9 @@ func LoadConfig(configFile string) Config {
 		}
 
 		//Init channels
-		lg.tailData = make([]chan []string, lg.goroutines)
+		lg.tail_data = make([]chan []string, lg.goroutines)
 		for i := 0; i < lg.goroutines; i++ {
-			lg.tailData[i] = make(chan []string, 1000)
+			lg.tail_data[i] = make(chan []string, 1000)
 		}
 
 		cfg.logGroups[name.(string)] = &lg
