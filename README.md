@@ -1,9 +1,9 @@
 <h1>logmetrics-collector</h1>
 
 logmetrics-collector is aimed at parsing log files containing performance data, computing statistics and outputting them to TSD or tcollector while using limited ressources. See also for a quick summary of the idea behind this kind of metric statistical aggregation:
-- [http://pivotallabs.com/139-metrics-metrics-everywhere/]
-- [http://metrics.codahale.com/getting-started/] \- Note that logmetrics-collector only implements a subset of this library, Meter and Histogram.
-- [Forward Decay Priority Sampling|http://dimacs.rutgers.edu/~graham/pubs/papers/fwddecay.pdf]: Paper on the method used for histogram generation.
+- http://pivotallabs.com/139-metrics-metrics-everywhere/
+- http://metrics.codahale.com/getting-started/ - Note that logmetrics-collector only implements a subset of this library, Meter and Histogram.
+- http://dimacs.rutgers.edu/~graham/pubs/papers/fwddecay.pdf: Paper on the method used for histogram generation.
 
 Big thanks to rcrowley for his go-metrics library!
 
