@@ -193,12 +193,12 @@ All this information is specific to a single host. A single call generates 13 st
 <h2>Keys generated</h2>
 
 <h3>Meter</h3>
-```
+
 - <key_prefix>.<key_suffix>.count: Sum of the values.
 - <key_prefix>.<key_suffix>.rate.times1k._1min: Moving average over 1 minute multiplied by 1000 to give better precision.
 - <key_prefix>.<key_suffix>.rate.times1k._5min: Moving average over 5 minutes multiplied by 1000 to give better precision.
 - <key_prefix>.<key_suffix>.rate.times1k._15min: Moving average over 15 minutes multiplied by 1000 to give better precision.
-```
+
 Example:
 ```
 rest.api.executions.count 1391745780 4 call=getUser host=api1.mynetwork class=api
@@ -208,7 +208,7 @@ rest.api.executions.rate.times1k._15min 1391745780 0 call=getUser host=api1.myne
 ```
 
 h3. Histogram
-```
+
 - <key_prefix>.<key_suffix>.min: Minimum in the sample.
 - <key_prefix>.<key_suffix>.max: Maximum in the sample.
 - <key_prefix>.<key_suffix>.mean: Average of the sample.
@@ -219,7 +219,7 @@ h3. Histogram
 - <key_prefix>.<key_suffix>.p99: Percentile 99.
 - <key_prefix>.<key_suffix>.p999: Percentile 99.9.
 - <key_prefix>.<key_suffix>.sample_size: Current sample size. For sampler tuning, likely to disappear. Badly named as well, gets the time unit right before it.
-```
+
 Example:
 ```
 rest.api.execution_time.ms.min 1391745767 11 call=getUser host=api1.mynetwork class=api
