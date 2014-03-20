@@ -7,7 +7,7 @@ logmetrics-collector is aimed at parsing log files containing performance data, 
 
 Big thanks to rcrowley for his go-metrics library!
 
-Here's 2 examples of that data it generates:
+Here's 3 examples of that data it generates:
 Exponentially weighted moving call count average by 1, 5 and 15 minutes (like Unix load average seen in uptime) + call count:
 
 ![](images/ewma.png)
