@@ -22,7 +22,7 @@ Distribution of minimum time spent by resource for calls + total time spent (sum
 
 
 
-h2. Features list
+<h2>Features list</h2>
 
 - Generic: everything is in the configuration file..
 - Not real time based, only the time seen in the log files is used for everything.
@@ -41,10 +41,10 @@ h2. Features list
 - Easy to deploy: a single statically compiled binary.
 - Written in Go.
 
-h2. Configuration
+<h2>Configuration</h2>
 
 Here's the configuration for fictional service.  Comments inline. It's in json-like yaml.
-{code}
+
 {
   # Log group, you can define multiple of these
   rest.api: {
@@ -170,7 +170,7 @@ Here's the configuration for fictional service.  Comments inline. It's in json-l
     #Seconds to wait before retrying to send data when unable to contact tsd/tcollector
     push_wait: 5
   }
-{code}
+
 
 With this configuration and the level of information we have in the performance logs in this fictive applications we can extract the following information:
 - Meter information: Simple counter going up by the value parsed on each line.
@@ -190,9 +190,9 @@ For each of these we compute:
 
 All this information is specific to a single host. A single call generates 13 stats * 6 resources = 78 keys every "interval".
 
-h2. Keys generated
+<h2>Keys generated</h2>
 
-h3. Meter
+<h3>Meter</h3>
 
 - <key_prefix>.<key_suffix>.count: Sum of the values.
 - <key_prefix>.<key_suffix>.rate.times1k._1min: Moving average over 1 minute multiplied by 1000 to give better precision.
@@ -200,12 +200,12 @@ h3. Meter
 - <key_prefix>.<key_suffix>.rate.times1k._15min: Moving average over 15 minutes multiplied by 1000 to give better precision.
 
 Example:
-{code}
+
 rest.api.executions.count 1391745780 4 call=getUser host=api1.mynetwork class=api
 rest.api.executions.rate.times1k._1min 1391745780 0 call=getUser host=api1.mynetwork class=api
 rest.api.executions.rate.times1k._5min 1391745780 0 call=getUser host=api1.mynetwork class=api
 rest.api.executions.rate.times1k._15min 1391745780 0 call=getUser host=api1.mynetwork class=api
-{code}
+
 
 h3. Histogram
 
@@ -221,7 +221,7 @@ h3. Histogram
 - <key_prefix>.<key_suffix>.sample_size: Current sample size. For sampler tuning, likely to disappear. Badly named as well, gets the time unit right before it.
 
 Example:
-{code}
+
 rest.api.execution_time.ms.min 1391745767 11 call=getUser host=api1.mynetwork class=api
 rest.api.execution_time.ms.max 1391745767 16 call=getUser host=api1.mynetwork class=api
 rest.api.execution_time.ms.mean 1391745767 13 call=getUser host=api1.mynetwork class=api
@@ -232,7 +232,7 @@ rest.api.execution_time.ms.p95 1391745767 16 call=getUser host=api1.mynetwork cl
 rest.api.execution_time.ms.p99 1391745767 16 call=getUser host=api1.mynetwork class=api
 rest.api.execution_time.ms.p999 1391745767 16 call=getUser host=api1.mynetwork class=api
 rest.api.execution_time.ms.sample_size 1391745767 3 call=getUser host=api1.mynetwork class=api
-{code}
+
 
 h2. Internals
 
@@ -248,7 +248,7 @@ Channels are a way to communicate between goroutines that's safer and easier to 
 
 *FIXME* make a diagram of this
 
-h2. Todo:
+<h2>Todo</h2>
 
 List of tasks pending related to logmetrics-collector.
 
