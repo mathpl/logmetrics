@@ -5,7 +5,6 @@ import (
 	"log"
 	"runtime"
 	"syseng/logmetrics"
-	//"time"
 	"log/syslog"
 	"os"
 	"os/signal"
@@ -13,7 +12,7 @@ import (
 	"syscall"
 )
 
-var configFile = flag.String("c", "/home/mpa/backlog/go/src/syseng/logmetrics/logmetrics-collector.conf", "Full path to config file.")
+var configFile = flag.String("c", "/etc/logmetrics-collector.conf", "Full path to config file.")
 var threads = flag.Int("j", 1, "Thread count.")
 var logToConsole = flag.Bool("d", false, "Print to console.")
 var doNotSend = flag.Bool("D", false, "Do not send data out to TSD.")
