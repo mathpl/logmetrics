@@ -3,13 +3,13 @@ package main
 import (
 	"flag"
 	"log"
-	"runtime"
-	"syseng/logmetrics"
 	"log/syslog"
 	"os"
 	"os/signal"
+	"runtime"
 	"runtime/pprof"
 	"syscall"
+	"syseng/logmetrics"
 )
 
 var configFile = flag.String("c", "/etc/logmetrics-collector.conf", "Full path to config file.")
@@ -43,10 +43,6 @@ func main() {
 	}
 	defer logger.Close()
 
-	if !*logToConsole {
-		log.SetOutput(logger)
-	}
-
 	//Channel to stop the program
 	stop := make(chan bool)
 
@@ -66,6 +62,10 @@ func main() {
 
 	//Config
 	config := logmetrics.LoadConfig(*configFile)
+
+	if !*logToConsole {
+		log.SetOutput(logger)
+	}
 
 	//Start log tails
 	logmetrics.StartTails(&config)
