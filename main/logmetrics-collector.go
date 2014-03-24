@@ -36,13 +36,6 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 
-	//Logger
-	logger, err := syslog.New(syslog.LOG_LOCAL3, "logmetrics")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer logger.Close()
-
 	//Channel to stop the program
 	stop := make(chan bool)
 
@@ -62,6 +55,13 @@ func main() {
 
 	//Config
 	config := logmetrics.LoadConfig(*configFile)
+
+	//Logger
+	logger, err := syslog.New(syslog.LOG_LOCAL3, "logmetrics")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer logger.Close()
 
 	if !*logToConsole {
 		log.SetOutput(logger)
