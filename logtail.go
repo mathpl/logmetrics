@@ -34,7 +34,6 @@ func tailFile(channel_number int, filename string, logGroup *LogGroup) {
 	}
 	log.Printf("Tailing %s data to datapool[%s:%d]", filename, logGroup.name, channel_number)
 
-	re := logGroup.re
 	//FIXME: Bug in ActiveTail can get partial lines
 	for line := range tail.Lines {
 		if line.Err != nil {
@@ -42,13 +41,20 @@ func tailFile(channel_number int, filename string, logGroup *LogGroup) {
 			return
 		}
 
-		if matches := re.FindStringSubmatch(line.Text); len(matches) == maxMatches {
-			//Decide which datapool channel to send the line to
-			//split_val := logGroup.workload_split_on + 1
+		//Test out all the regexp, pick the first one that matches
+		match_one := false
+		for _, re := range logGroup.re {
+			if matches := re.FindStringSubmatch(line.Text); len(matches) == maxMatches {
+				//Decide which datapool channel to send the line to
+				//split_val := logGroup.workload_split_on + 1
 
-			logGroup.tail_data[channel_number] <- matches
-		} else if logGroup.fail_regex_warn {
-			log.Printf("Regexp match failed on %s, expected %d matches, got %d: %s", filename, maxMatches, len(matches), line.Text)
+				logGroup.tail_data[channel_number] <- matches
+				match_one = true
+			}
+		}
+
+		if logGroup.fail_regex_warn && !match_one {
+			log.Printf("Regexp match failed on %s, expected %d matches: %s", filename, maxMatches, line.Text)
 		}
 	}
 

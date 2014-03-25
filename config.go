@@ -38,8 +38,8 @@ type KeyExtract struct {
 type LogGroup struct {
 	name             string
 	globFiles        []string
-	re               *regexp.Regexp
-	strRegexp        string
+	re               []*regexp.Regexp
+	strRegexp        []string
 	expected_matches int
 
 	date_position int
@@ -253,11 +253,6 @@ func LoadConfig(configFile string) Config {
 			switch v := val.(type) {
 			case string:
 				switch key {
-				case "re":
-					var err error
-					if lg.strRegexp, lg.re, err = cleanSre2(lg.name, v); err != nil {
-						log.Fatal(err)
-					}
 				case "key_prefix":
 					lg.key_prefix = v
 
@@ -309,6 +304,16 @@ func LoadConfig(configFile string) Config {
 
 			case []interface{}:
 				switch key {
+				case "re":
+					var err error
+					lg.re = make([]*regexp.Regexp, len(v))
+					lg.strRegexp = make([]string, len(v))
+					for i, re := range v {
+						if lg.strRegexp[i], lg.re[i], err = cleanSre2(lg.name, re.(string)); err != nil {
+							log.Fatal(err)
+						}
+					}
+
 				case "files":
 					for _, file := range v {
 						lg.globFiles = append(lg.globFiles, file.(string))
