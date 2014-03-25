@@ -57,7 +57,7 @@ func main() {
 	config := logmetrics.LoadConfig(*configFile)
 
 	//Logger
-	logger, err := syslog.New(syslog.LOG_LOCAL3, "logmetrics")
+	logger, err := syslog.New(syslog.LOG_LOCAL3, "logmetrics_collector")
 	if err != nil {
 		log.Fatal(err)
 	}

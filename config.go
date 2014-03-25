@@ -39,6 +39,7 @@ type LogGroup struct {
 	name             string
 	globFiles        []string
 	re               *regexp.Regexp
+	strRegexp        string
 	expected_matches int
 
 	date_position int
@@ -77,7 +78,7 @@ func (conf *Config) GetPusherNumber() int {
 	return conf.pushNumber
 }
 
-func cleanSre2(log_group_name string, re string) (*regexp.Regexp, error) {
+func cleanSre2(log_group_name string, re string) (string, *regexp.Regexp, error) {
 	//Little hack to support extended style regex. Removes comments, spaces en endline
 	noSpacesRe := strings.Replace(re, " ", "", -1)
 	splitRe := strings.Split(noSpacesRe, "\\n")
@@ -89,13 +90,11 @@ func cleanSre2(log_group_name string, re string) (*regexp.Regexp, error) {
 	}
 	cleanRe := strings.Join(rebuiltRe, "")
 
-	log.Printf("Cleaned regex used for %s: %s", log_group_name, cleanRe)
-
 	//Try to compile the regex
 	if compiledRe, err := regexp.Compile(cleanRe); err == nil {
-		return compiledRe, nil
+		return cleanRe, compiledRe, nil
 	} else {
-		return nil, err
+		return "", nil, err
 	}
 }
 
@@ -256,7 +255,7 @@ func LoadConfig(configFile string) Config {
 				switch key {
 				case "re":
 					var err error
-					if lg.re, err = cleanSre2(lg.name, v); err != nil {
+					if lg.strRegexp, lg.re, err = cleanSre2(lg.name, v); err != nil {
 						log.Fatal(err)
 					}
 				case "key_prefix":
