@@ -291,19 +291,19 @@ func (lg LogGroup) dataPoolHandler(channel_number int, tsd_pushers []chan []stri
 						nbKeys += 10
 					case timemetrics.Counter:
 						snap := v.Snapshot()
-						if snap.GetMaxTime().After(tsdPoint.lastPush) {
+						if snap.GetMaxTime().Unix() > tsdPoint.lastPush.Unix() {
 							tsd_push <- getCounterKeys(tsd_key, snap)
 						}
 						nbKeys += 1
 					case timemetrics.Meter:
 						snap := v.Snapshot()
 
-						if snap.GetMaxTime().After(tsdPoint.lastPush) {
+						if snap.GetMaxTime().Unix() > tsdPoint.lastPush.Unix() {
 							tsdPoint.lastPush = snap.GetMaxTime()
 							tsd_push <- getMeterKeyCount(tsd_key, snap)
 						}
 
-						if snap.GetMaxEWMATime().After(tsdPoint.lastCrunchedPush) {
+						if snap.GetMaxEWMATime().Unix() > tsdPoint.lastCrunchedPush.Unix() {
 							tsdPoint.lastCrunchedPush = snap.GetMaxEWMATime()
 							tsd_push <- getMeterKeyRates(tsd_key, snap)
 						}
