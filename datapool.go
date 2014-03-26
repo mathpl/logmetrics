@@ -255,16 +255,16 @@ func (lg LogGroup) dataPoolHandler(channel_number int, tsd_pushers []chan []stri
 
 				//Support for log playback - Push when <interval> has pass in the logs, not real time
 				if point_time.Sub(*lastTimePushed) > (time.Duration(lg.interval) * time.Second) {
-					interval := int(point_time.Sub(*lastTimePushed).Seconds())
+					interval := int(point_time.Unix() - (*lastTimePushed).Unix())
 
 					//Update EWMAs
 					for _, tsdPoint := range dataPool {
 						switch v := tsdPoint.data.(type) {
 						case timemetrics.Meter:
-							sec_since_last_value := point_time.Sub(v.GetMaxTime()).Unix()
-							sec_since_last_ewma_crunch := point_time.Sub(v.GetMaxEWMATime()).Unix()
+							sec_since_last_value := int(point_time.Unix() - v.GetMaxTime().Unix())
+							sec_since_last_ewma_crunch := int(point_time.Unix() - v.GetMaxEWMATime().Unix())
 
-							if sec_since_last_value > float64(interval) || sec_since_last_ewma_crunch > float64(lg.ewmaInterval) {
+							if sec_since_last_value > interval || sec_since_last_ewma_crunch > lg.ewmaInterval {
 								v.CrunchEWMA(point_time, interval)
 							}
 						}
