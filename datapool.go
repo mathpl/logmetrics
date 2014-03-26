@@ -107,7 +107,7 @@ func (lg *LogGroup) getKeys(data []string) ([]dataPoint, time.Time) {
 		//Is the value a metric?
 		if keyType, ok := lg.metrics[position]; ok {
 			//Key name
-			key := fmt.Sprintf("%s.%s.%s %s %s", lg.key_prefix, keyType.key_suffix, "%s %d %d", strings.Join(tags, " "), keyType.tag)
+			key := fmt.Sprintf("%s.%s.%s %s %s", lg.key_prefix, keyType.key_suffix, "%s %d %s", strings.Join(tags, " "), keyType.tag)
 
 			//Do we need to do any operation on this val?
 			for op, opvalues := range keyType.operations {
@@ -143,7 +143,7 @@ func getCounterKeys(name string, c timemetrics.Counter) []string {
 	t := int(c.GetMaxTime().Unix())
 
 	keys := make([]string, 1)
-	keys[0] = fmt.Sprintf(name, "count", t, c.Count())
+	keys[0] = fmt.Sprintf(name, "count", t, fmt.Sprintf("%d", c.Count()))
 
 	return keys
 }
@@ -152,7 +152,7 @@ func getMeterKeyCount(name string, m timemetrics.Meter) []string {
 	t := int(m.GetMaxTime().Unix())
 
 	keys := make([]string, 1)
-	keys[0] = fmt.Sprintf(name, "count", t, m.Count())
+	keys[0] = fmt.Sprintf(name, "count", t, fmt.Sprintf("%d", m.Count()))
 
 	return keys
 }
@@ -161,10 +161,9 @@ func getMeterKeyRates(name string, m timemetrics.Meter) []string {
 	t := int(m.GetMaxEWMATime().Unix())
 
 	keys := make([]string, 3)
-	keys[0] = fmt.Sprintf(name, "rate.times1k._1min", t, int64(m.Rate1()))
-	keys[1] = fmt.Sprintf(name, "rate.times1k._5min", t, int64(m.Rate5()))
-	keys[2] = fmt.Sprintf(name, "rate.times1k._15min", t, int64(m.Rate15()))
-	keys[2] = fmt.Sprintf(name, "rate.times1k._15min", t, int64(m.Rate15()))
+	keys[0] = fmt.Sprintf(name, "rate._1min", t, fmt.Sprintf("%.4f", m.Rate1()))
+	keys[1] = fmt.Sprintf(name, "rate._5min", t, fmt.Sprintf("%.4f", m.Rate5()))
+	keys[2] = fmt.Sprintf(name, "rate._15min", t, fmt.Sprintf("%.4f", m.Rate15()))
 
 	return keys
 }
@@ -175,16 +174,16 @@ func getHistogramKeys(name string, h timemetrics.Histogram) []string {
 
 	keys := make([]string, 10)
 
-	keys[0] = fmt.Sprintf(name, "min", t, h.Min())
-	keys[1] = fmt.Sprintf(name, "max", t, h.Max())
-	keys[2] = fmt.Sprintf(name, "mean", t, int64(h.Mean()))
-	keys[3] = fmt.Sprintf(name, "std-dev", t, int64(h.StdDev()))
-	keys[4] = fmt.Sprintf(name, "p50", t, int64(ps[0]))
-	keys[5] = fmt.Sprintf(name, "p75", t, int64(ps[1]))
-	keys[6] = fmt.Sprintf(name, "p95", t, int64(ps[2]))
-	keys[7] = fmt.Sprintf(name, "p99", t, int64(ps[3]))
-	keys[8] = fmt.Sprintf(name, "p999", t, int64(ps[4]))
-	keys[9] = fmt.Sprintf(name, "sample_size", t, h.Sample().Size())
+	keys[0] = fmt.Sprintf(name, "min", t, fmt.Sprintf("%d", h.Min()))
+	keys[1] = fmt.Sprintf(name, "max", t, fmt.Sprintf("%d", h.Max()))
+	keys[2] = fmt.Sprintf(name, "mean", t, fmt.Sprintf("%.4f", h.Mean()))
+	keys[3] = fmt.Sprintf(name, "std-dev", t, fmt.Sprintf("%.4f", h.StdDev()))
+	keys[4] = fmt.Sprintf(name, "p50", t, fmt.Sprintf("%d", int64(ps[0])))
+	keys[5] = fmt.Sprintf(name, "p75", t, fmt.Sprintf("%d", int64(ps[1])))
+	keys[6] = fmt.Sprintf(name, "p95", t, fmt.Sprintf("%d", int64(ps[2])))
+	keys[7] = fmt.Sprintf(name, "p99", t, fmt.Sprintf("%d", int64(ps[3])))
+	keys[8] = fmt.Sprintf(name, "p999", t, fmt.Sprintf("%d", int64(ps[4])))
+	keys[9] = fmt.Sprintf(name, "sample_size", t, fmt.Sprintf("%d", h.Sample().Size()))
 
 	return keys
 }

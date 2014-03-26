@@ -62,7 +62,7 @@ func tailFile(channel_number int, filename string, logGroup *LogGroup) {
 }
 func startLogGroup(logGroup *LogGroup, pollInterval int) {
 	log.Printf("Filename poller for %s started", logGroup.name)
-	log.Printf("Using the following regexp for log group %s: ", logGroup.name, logGroup.strRegexp)
+	log.Printf("Using the following regexp for log group %s: %s", logGroup.name, logGroup.strRegexp)
 
 	rescanFiles := make(chan bool, 1)
 	go func() {
