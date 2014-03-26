@@ -261,8 +261,8 @@ func (lg LogGroup) dataPoolHandler(channel_number int, tsd_pushers []chan []stri
 					for _, tsdPoint := range dataPool {
 						switch v := tsdPoint.data.(type) {
 						case timemetrics.Meter:
-							sec_since_last_value := point_time.Sub(v.GetMaxTime()).Seconds()
-							sec_since_last_ewma_crunch := point_time.Sub(v.GetMaxEWMATime()).Seconds()
+							sec_since_last_value := point_time.Sub(v.GetMaxTime()).Unix()
+							sec_since_last_ewma_crunch := point_time.Sub(v.GetMaxEWMATime()).Unix()
 
 							if sec_since_last_value > float64(interval) || sec_since_last_ewma_crunch > float64(lg.ewmaInterval) {
 								v.CrunchEWMA(point_time, interval)
