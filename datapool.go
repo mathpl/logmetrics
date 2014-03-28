@@ -204,8 +204,6 @@ func (lg LogGroup) dataPoolHandler(channel_number int, tsd_pushers []chan []stri
 		//	}
 		//}()
 
-		pushStats := make(chan bool)
-
 		var lastTimePushed *time.Time
 		lastNbKeys := 0
 		for {
@@ -261,10 +259,10 @@ func (lg LogGroup) dataPoolHandler(channel_number int, tsd_pushers []chan []stri
 					for _, tsdPoint := range dataPool {
 						switch v := tsdPoint.data.(type) {
 						case timemetrics.Meter:
-							sec_since_last_value := int(point_time.Unix() - v.GetMaxTime().Unix())
+							sec_since_last_update := int(point_time.Unix() - v.GetMaxTime().Unix())
 							sec_since_last_ewma_crunch := int(point_time.Unix() - v.GetMaxEWMATime().Unix())
 
-							if sec_since_last_value > interval || sec_since_last_ewma_crunch > lg.ewmaInterval {
+							if sec_since_last_update < lg.interval || sec_since_last_ewma_crunch > lg.ewmaInterval {
 								v.CrunchEWMA(point_time, interval)
 							}
 						}
@@ -272,56 +270,60 @@ func (lg LogGroup) dataPoolHandler(channel_number int, tsd_pushers []chan []stri
 
 					lastTimePushed = &point_time
 
-					go func() { pushStats <- true }()
-				}
+					nbKeys := pushStats(tsd_push, dataPool)
 
-			case <-pushStats:
-				nbKeys := 0
-				for tsd_key, tsdPoint := range dataPool {
-					switch v := tsdPoint.data.(type) {
-					case timemetrics.Histogram:
-						snap := v.Snapshot()
-
-						if snap.GetMaxTime().Unix() > tsdPoint.lastPush.Unix() { //Only push updated metrics
-							tsdPoint.lastPush = snap.GetMaxTime()
-							keys := getHistogramKeys(tsd_key, snap)
-							tsd_push <- keys
-						}
-
-						nbKeys += 10
-					case timemetrics.Counter:
-						snap := v.Snapshot()
-						if snap.GetMaxTime().Unix() > tsdPoint.lastPush.Unix() {
-							tsd_push <- getCounterKeys(tsd_key, snap)
-						}
-						nbKeys += 1
-					case timemetrics.Meter:
-						snap := v.Snapshot()
-
-						if snap.GetMaxTime().Unix() > tsdPoint.lastPush.Unix() {
-							tsdPoint.lastPush = snap.GetMaxTime()
-							tsd_push <- getMeterKeyCount(tsd_key, snap)
-						}
-
-						if snap.GetMaxEWMATime().Unix() > tsdPoint.lastCrunchedPush.Unix() {
-							tsdPoint.lastCrunchedPush = snap.GetMaxEWMATime()
-							tsd_push <- getMeterKeyRates(tsd_key, snap)
-						}
-
-						nbKeys += 4
+					if lastNbKeys != nbKeys {
+						log.Printf("Datapool[%s:%d] currently tracking %d keys", lg.name, channel_number, nbKeys)
 					}
-				}
 
-				if lastNbKeys != nbKeys {
-					log.Printf("Datapool[%s:%d] currently tracking %d keys", lg.name, channel_number, nbKeys)
+					lastNbKeys = nbKeys
 				}
-
-				lastNbKeys = nbKeys
 			}
 		}
 	}()
 
 	return nil
+}
+
+func pushStats(tsd_push chan []string, dataPool map[string]*tsdPoint) (nbKeys int) {
+	nbKeys = 0
+
+	for tsd_key, tsdPoint := range dataPool {
+		switch v := tsdPoint.data.(type) {
+		case timemetrics.Histogram:
+			snap := v.Snapshot()
+
+			if snap.GetMaxTime().Unix() > tsdPoint.lastPush.Unix() { //Only push updated metrics
+				tsdPoint.lastPush = snap.GetMaxTime()
+				keys := getHistogramKeys(tsd_key, snap)
+				tsd_push <- keys
+			}
+
+			nbKeys += 10
+		case timemetrics.Counter:
+			snap := v.Snapshot()
+			if snap.GetMaxTime().Unix() > tsdPoint.lastPush.Unix() {
+				tsd_push <- getCounterKeys(tsd_key, snap)
+			}
+			nbKeys += 1
+		case timemetrics.Meter:
+			snap := v.Snapshot()
+
+			if snap.GetMaxTime().Unix() > tsdPoint.lastPush.Unix() {
+				tsdPoint.lastPush = snap.GetMaxTime()
+				tsd_push <- getMeterKeyCount(tsd_key, snap)
+			}
+
+			if snap.GetMaxEWMATime().Unix() > tsdPoint.lastCrunchedPush.Unix() {
+				tsdPoint.lastCrunchedPush = snap.GetMaxEWMATime()
+				tsd_push <- getMeterKeyRates(tsd_key, snap)
+			}
+
+			nbKeys += 4
+		}
+	}
+
+	return
 }
 
 func StartDataPools(config *Config, tsd_pushers []chan []string) {
