@@ -253,19 +253,14 @@ func (lg LogGroup) dataPoolHandler(channel_number int, tsd_pushers []chan []stri
 
 				//Support for log playback - Push when <interval> has pass in the logs, not real time
 				if point_time.Sub(*lastTimePushed) > (time.Duration(lg.interval) * time.Second) {
-					interval := int(point_time.Unix() - (*lastTimePushed).Unix())
-
 					//Update EWMAs
 					for _, tsdPoint := range dataPool {
 						switch v := tsdPoint.data.(type) {
 						case timemetrics.Meter:
-							sec_since_last_update := int(point_time.Unix() - v.GetMaxTime().Unix())
 							sec_since_last_ewma_crunch := int(point_time.Unix() - v.GetMaxEWMATime().Unix())
 
-							//Underlying counter has been updated since at least ewma_interval OR
-							//ewma hasn't been updated since ewma_idle_interval
-							if sec_since_last_update > lg.ewma_interval || sec_since_last_ewma_crunch > lg.ewma_idle_interval {
-								v.CrunchEWMA(point_time, interval)
+							if sec_since_last_ewma_crunch > lg.ewma_interval {
+								v.CrunchEWMA(point_time)
 							}
 						}
 					}
@@ -309,16 +304,15 @@ func pushStats(tsd_push chan []string, dataPool map[string]*tsdPoint) (nbKeys in
 			}
 			nbKeys += 1
 		case timemetrics.Meter:
-			snap := v.Snapshot()
 
-			if snap.GetMaxTime().Unix() > tsdPoint.lastPush.Unix() {
-				tsdPoint.lastPush = snap.GetMaxTime()
-				tsd_push <- getMeterKeyCount(tsd_key, snap)
+			if v.GetMaxTime().Unix() > tsdPoint.lastPush.Unix() {
+				tsdPoint.lastPush = v.GetMaxTime()
+				tsd_push <- getMeterKeyCount(tsd_key, v)
 			}
 
-			if snap.GetMaxEWMATime().Unix() > tsdPoint.lastCrunchedPush.Unix() {
-				tsdPoint.lastCrunchedPush = snap.GetMaxEWMATime()
-				tsd_push <- getMeterKeyRates(tsd_key, snap)
+			if v.GetMaxEWMATime().Unix() > tsdPoint.lastCrunchedPush.Unix() {
+				tsdPoint.lastCrunchedPush = v.GetMaxEWMATime()
+				tsd_push <- getMeterKeyRates(tsd_key, v)
 			}
 
 			nbKeys += 4

@@ -52,7 +52,6 @@ type LogGroup struct {
 	histogram_size                  int
 	histogram_alpha_decay           float64
 	histogram_rescale_threshold_min int
-	ewma_idle_interval              int
 	ewma_interval                   int
 
 	goroutines        int
@@ -265,8 +264,6 @@ func LoadConfig(configFile string) Config {
 				switch key {
 				case "interval":
 					lg.interval = v
-				case "ewma_idle_interval":
-					lg.ewma_idle_interval = v
 				case "ewma_interval":
 					lg.ewma_interval = v
 				case "expected_matches":
@@ -369,11 +366,8 @@ func LoadConfig(configFile string) Config {
 		if lg.histogram_rescale_threshold_min == 0 {
 			lg.histogram_rescale_threshold_min = 60
 		}
-		if lg.ewma_idle_interval == 0 {
-			lg.ewma_idle_interval = 300
-		}
 		if lg.ewma_interval == 0 {
-			lg.ewma_interval = 60
+			lg.ewma_interval = 30
 		}
 
 		//Init channels
