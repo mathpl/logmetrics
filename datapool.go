@@ -262,7 +262,9 @@ func (lg LogGroup) dataPoolHandler(channel_number int, tsd_pushers []chan []stri
 							sec_since_last_update := int(point_time.Unix() - v.GetMaxTime().Unix())
 							sec_since_last_ewma_crunch := int(point_time.Unix() - v.GetMaxEWMATime().Unix())
 
-							if sec_since_last_update < lg.interval || sec_since_last_ewma_crunch > lg.ewmaInterval {
+							//Underlying counter has been updated since last interval and it's been at least ewma_interval OR
+							//ewma hasn't been updated since ewma_idle_interval
+							if (sec_since_last_update < lg.interval && sec_since_last_update > lg.ewma_interval) || sec_since_last_ewma_crunch > lg.ewma_idle_interval {
 								v.CrunchEWMA(point_time, interval)
 							}
 						}
