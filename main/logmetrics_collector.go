@@ -6,8 +6,10 @@ import (
 	"log/syslog"
 	"os"
 	"os/signal"
+	"os/user"
 	"runtime"
 	"runtime/pprof"
+	"strconv"
 	"syscall"
 	"syseng/logmetrics"
 )
@@ -55,6 +57,29 @@ func main() {
 
 	//Config
 	config := logmetrics.LoadConfig(*configFile)
+
+	//Switch user
+	if config.GetUser() != "" {
+		if user, err := user.Lookup(config.GetUser()); err == nil {
+			uid, _ := strconv.Atoi(user.Uid)
+			if err = syscall.Setuid(uid); err != nil {
+				log.Fatalf("Unable to change running user to %s: %s", config.GetUser(), err)
+			}
+
+			gid, _ := strconv.Atoi(user.Uid)
+			if err = syscall.Setgid(gid); err != nil {
+				log.Fatalf("Unable to change running user to %s: %s", config.GetUser(), err)
+			}
+
+			log.Printf("Changed to user %s (uid:%d gid:%d)", config.GetUser(), user.Uid, user.Gid)
+		} else {
+			log.Fatalf("Unable to change running user to %s: %s", config.GetUser(), err)
+		}
+	} else {
+		log.Printf("No user setting, running as current user.")
+	}
+
+	os.Exit(0)
 
 	//Logger
 	logger, err := syslog.New(syslog.LOG_LOCAL3, "logmetrics_collector")
