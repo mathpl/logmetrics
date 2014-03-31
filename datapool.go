@@ -45,7 +45,7 @@ func (lg *LogGroup) getKeys(data []string) ([]dataPoint, time.Time) {
 
 	tags := lg.extractTags(data)
 
-	nbKeys := len(lg.metrics)
+	nbKeys := lg.getNbKeys()
 	dataPoints := make([]dataPoint, nbKeys)
 
 	//Time
@@ -74,29 +74,31 @@ func (lg *LogGroup) getKeys(data []string) ([]dataPoint, time.Time) {
 
 	//Make a first pass extracting the data, applying float->int conversion on multiplier
 	values := make([]int64, lg.expected_matches+1)
-	for position, keyType := range lg.metrics {
-		if position == 0 {
-			values[position] = 1
-		} else {
-			var val int64
-			var err error
-			if keyType.format == "float" {
-				var val_float float64
-				if val_float, err = strconv.ParseFloat(data[position], 64); err == nil {
-					val = int64(val_float * float64(keyType.multiply))
-				}
+	for position, keyTypes := range lg.metrics {
+		for _, keyType := range keyTypes {
+			if position == 0 {
+				values[position] = 1
 			} else {
-				if val, err = strconv.ParseInt(data[position], 10, 64); err == nil {
-					val = val * int64(keyType.multiply)
+				var val int64
+				var err error
+				if keyType.format == "float" {
+					var val_float float64
+					if val_float, err = strconv.ParseFloat(data[position], 64); err == nil {
+						val = int64(val_float * float64(keyType.multiply))
+					}
+				} else {
+					if val, err = strconv.ParseInt(data[position], 10, 64); err == nil {
+						val = val * int64(keyType.multiply)
+					}
 				}
-			}
 
-			if err != nil {
-				log.Printf("Unable to extract data from value match, %s: %s", err, data[position])
-				var nt time.Time
-				return nil, nt
-			} else {
-				values[position] = val
+				if err != nil {
+					log.Printf("Unable to extract data from value match, %s: %s", err, data[position])
+					var nt time.Time
+					return nil, nt
+				} else {
+					values[position] = val
+				}
 			}
 		}
 	}
@@ -105,7 +107,7 @@ func (lg *LogGroup) getKeys(data []string) ([]dataPoint, time.Time) {
 	var i = 0
 	for position, val := range values {
 		//Is the value a metric?
-		if keyType, ok := lg.metrics[position]; ok {
+		for _, keyType := range lg.metrics[position] {
 			//Key name
 			key := fmt.Sprintf("%s.%s.%s %s %s", lg.key_prefix, keyType.key_suffix, "%s %d %s", strings.Join(tags, " "), keyType.tag)
 
@@ -228,7 +230,7 @@ func (lg LogGroup) dataPoolHandler(channel_number int, tsd_pushers []chan []stri
 							dataPool[data_point.name] = &tsdPoint{data: timemetrics.NewCounter(point_time),
 								lastPush: point_time}
 						case "meter":
-							dataPool[data_point.name] = &tsdPoint{data: timemetrics.NewMeter(point_time, lg.interval),
+							dataPool[data_point.name] = &tsdPoint{data: timemetrics.NewMeter(point_time),
 								lastPush: point_time, lastCrunchedPush: point_time}
 						default:
 							log.Fatalf("Unexpected metric type %s!", data_point.metric_type)
@@ -259,7 +261,7 @@ func (lg LogGroup) dataPoolHandler(channel_number int, tsd_pushers []chan []stri
 						case timemetrics.Meter:
 							sec_since_last_ewma_crunch := int(point_time.Unix() - v.GetMaxEWMATime().Unix())
 
-							if sec_since_last_ewma_crunch > lg.ewma_interval {
+							if sec_since_last_ewma_crunch >= lg.ewma_interval {
 								v.CrunchEWMA(point_time)
 							}
 						}

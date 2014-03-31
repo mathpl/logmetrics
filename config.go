@@ -47,7 +47,7 @@ type LogGroup struct {
 
 	key_prefix string
 	tags       map[string]int
-	metrics    map[int]KeyExtract
+	metrics    map[int][]KeyExtract
 
 	histogram_size                  int
 	histogram_alpha_decay           float64
@@ -74,6 +74,14 @@ func (lg *LogGroup) getNbTags() int {
 	return len(lg.tags)
 }
 
+func (lg *LogGroup) getNbKeys() int {
+	i := 0
+	for _, metrics := range lg.metrics {
+		i += len(metrics)
+	}
+	return i
+}
+
 func (conf *Config) GetPusherNumber() int {
 	return conf.pushNumber
 }
@@ -98,8 +106,8 @@ func cleanSre2(log_group_name string, re string) (string, *regexp.Regexp, error)
 	}
 }
 
-func parseMetrics(conf map[interface{}]interface{}) map[int]KeyExtract {
-	keyExtracts := make(map[int]KeyExtract)
+func parseMetrics(conf map[interface{}]interface{}) map[int][]KeyExtract {
+	keyExtracts := make(map[int][]KeyExtract)
 
 	for metric_type, metrics := range conf {
 		switch m := metrics.(type) {
@@ -139,8 +147,10 @@ func parseMetrics(conf map[interface{}]interface{}) map[int]KeyExtract {
 					}
 				}
 
-				keyExtracts[position] = KeyExtract{tag: tag, metric_type: metric_type.(string),
-					key_suffix: key_suffix, format: format, multiply: multiply, operations: operations}
+				newKey := KeyExtract{tag: tag, metric_type: metric_type.(string), key_suffix: key_suffix,
+					format: format, multiply: multiply, operations: operations}
+
+				keyExtracts[position] = append(keyExtracts[position], newKey)
 			}
 		}
 
