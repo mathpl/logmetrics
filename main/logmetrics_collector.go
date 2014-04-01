@@ -10,7 +10,6 @@ import (
 	"runtime/pprof"
 	"syscall"
 	"syseng/logmetrics"
-	"time"
 )
 
 var configFile = flag.String("c", "/etc/logmetrics_collector.conf", "Full path to config file.")
