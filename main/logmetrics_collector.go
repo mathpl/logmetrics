@@ -68,9 +68,6 @@ func main() {
 		log.SetOutput(logger)
 	}
 
-	time.Sleep(1 * time.Minute)
-	os.Exit(0)
-
 	//Start log tails
 	logmetrics.StartTails(&config)
 
