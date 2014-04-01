@@ -23,7 +23,6 @@ type Config struct {
 	stats_wait   int
 	logGroups    map[string]*LogGroup
 	logFacility  syslog.Priority
-	user         string
 }
 
 type KeyExtract struct {
@@ -85,10 +84,6 @@ func (lg *LogGroup) getNbKeys() int {
 
 func (conf *Config) GetPusherNumber() int {
 	return conf.pushNumber
-}
-
-func (conf *Config) GetUser() string {
-	return conf.user
 }
 
 func cleanSre2(log_group_name string, re string) (string, *regexp.Regexp, error) {
@@ -218,8 +213,6 @@ func LoadConfig(configFile string) Config {
 				cfg.pushProto = v
 			case "push_type":
 				cfg.pushType = v
-			case "user":
-				cfg.user = v
 
 			default:
 				log.Fatalf("Unknown key settings.%s", key)

@@ -12,9 +12,10 @@ import (
 	"strconv"
 	"syscall"
 	"syseng/logmetrics"
+	"time"
 )
 
-var configFile = flag.String("c", "/etc/logmetrics-collector.conf", "Full path to config file.")
+var configFile = flag.String("c", "/etc/logmetrics_collector.conf", "Full path to config file.")
 var threads = flag.Int("j", 1, "Thread count.")
 var logToConsole = flag.Bool("d", false, "Print to console.")
 var doNotSend = flag.Bool("D", false, "Do not send data out to TSD.")
@@ -23,9 +24,6 @@ var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
 func main() {
 	//Process execution flags
 	flag.Parse()
-
-	//Set the number of real threads to start
-	runtime.GOMAXPROCS(*threads)
 
 	//Enable cpu profiling if option is set
 	if *cpuprofile != "" {
@@ -37,6 +35,9 @@ func main() {
 		pprof.StartCPUProfile(f)
 		defer pprof.StopCPUProfile()
 	}
+
+	//Set the number of real threads to start
+	runtime.GOMAXPROCS(*threads)
 
 	//Channel to stop the program
 	stop := make(chan bool)
@@ -58,29 +59,6 @@ func main() {
 	//Config
 	config := logmetrics.LoadConfig(*configFile)
 
-	//Switch user
-	if config.GetUser() != "" {
-		if user, err := user.Lookup(config.GetUser()); err == nil {
-			uid, _ := strconv.Atoi(user.Uid)
-			if err = syscall.Setuid(uid); err != nil {
-				log.Fatalf("Unable to change running user to %s: %s", config.GetUser(), err)
-			}
-
-			gid, _ := strconv.Atoi(user.Uid)
-			if err = syscall.Setgid(gid); err != nil {
-				log.Fatalf("Unable to change running user to %s: %s", config.GetUser(), err)
-			}
-
-			log.Printf("Changed to user %s (uid:%d gid:%d)", config.GetUser(), user.Uid, user.Gid)
-		} else {
-			log.Fatalf("Unable to change running user to %s: %s", config.GetUser(), err)
-		}
-	} else {
-		log.Printf("No user setting, running as current user.")
-	}
-
-	os.Exit(0)
-
 	//Logger
 	logger, err := syslog.New(syslog.LOG_LOCAL3, "logmetrics_collector")
 	if err != nil {
@@ -91,6 +69,9 @@ func main() {
 	if !*logToConsole {
 		log.SetOutput(logger)
 	}
+
+	time.Sleep(1 * time.Minute)
+	os.Exit(0)
 
 	//Start log tails
 	logmetrics.StartTails(&config)
