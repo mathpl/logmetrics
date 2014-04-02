@@ -200,10 +200,10 @@ All this information is specific to a single host. A single call generates 13 st
 
 <h3>Meter</h3>
 
-- <key_prefix>.<key_suffix>.count: Sum of the values.
-- <key_prefix>.<key_suffix>.rate._1min: Moving average over 1 minute.
-- <key_prefix>.<key_suffix>.rate._5min: Moving average over 5 minutes.
-- <key_prefix>.<key_suffix>.rate._15min: Moving average over 15 minutes.
+- \<key_prefix>.\<key_suffix>.count: Sum of the values.
+- \<key_prefix>.\<key_suffix>.rate._1min: Moving average over 1 minute.
+- \<key_prefix>.\<key_suffix>.rate._5min: Moving average over 5 minutes.
+- \<key_prefix>.\<key_suffix>.rate._15min: Moving average over 15 minutes.
 
 Example:
 ```
@@ -215,16 +215,16 @@ rest.api.executions.rate._15min 1391745780 0.003 call=getUser host=api1.mynetwor
 
 h3. Histogram
 
-- <key_prefix>.<key_suffix>.min: Minimum in the sample.
-- <key_prefix>.<key_suffix>.max: Maximum in the sample.
-- <key_prefix>.<key_suffix>.mean: Average of the sample.
-- <key_prefix>.<key_suffix>.std_dev: Standard deviation.
-- <key_prefix>.<key_suffix>.p50: Percentile 50.
-- <key_prefix>.<key_suffix>.p75: Percentile 75.
-- <key_prefix>.<key_suffix>.p95: Percentile 95.
-- <key_prefix>.<key_suffix>.p99: Percentile 99.
-- <key_prefix>.<key_suffix>.p999: Percentile 99.9.
-- <key_prefix>.<key_suffix>.sample_size: Current sample size. For sampler tuning, likely to disappear. Badly named as well, gets the time unit right before it.
+- \<key_prefix>.\<key_suffix>.min: Minimum in the sample.
+- \<key_prefix>.\<key_suffix>.max: Maximum in the sample.
+- \<key_prefix>.\<key_suffix>.mean: Average of the sample.
+- \<key_prefix>.\<key_suffix>.std_dev: Standard deviation.
+- \<key_prefix>.\<key_suffix>.p50: Percentile 50.
+- \<key_prefix>.\<key_suffix>.p75: Percentile 75.
+- \<key_prefix>.\<key_suffix>.p95: Percentile 95.
+- \<key_prefix>.\<key_suffix>.p99: Percentile 99.
+- \<key_prefix>.\<key_suffix>.p999: Percentile 99.9.
+- \<key_prefix>.\<key_suffix>.sample_size: Current sample size. For sampler tuning, likely to disappear. Badly named as well, gets the time unit right before it.
 
 Example:
 ```
