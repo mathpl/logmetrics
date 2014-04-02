@@ -238,7 +238,7 @@ func (lg LogGroup) dataPoolHandler(channel_number int, tsd_pushers []chan []stri
 					}
 
 					//Make sure data is ordered or we risk sending duplicate data
-					if dataPool[data_point.name].lastPush.Unix() > point_time.Unix() {
+					if dataPool[data_point.name].lastPush.Unix() > point_time.Unix() && lg.out_of_order_time_warn {
 						log.Printf("Non-ordered data detected in log file. Its key already had a update at %s in the future. Offending line: %s",
 							dataPool[data_point.name].lastPush, data[0])
 					}

@@ -58,9 +58,10 @@ type LogGroup struct {
 	workload_split_on int
 	interval          int
 
-	fail_operation_warn bool
-	parse_from_start    bool
-	fail_regex_warn     bool
+	fail_operation_warn    bool
+	fail_regex_warn        bool
+	out_of_order_time_warn bool
+	parse_from_start       bool
 
 	//Channels
 	tail_data []chan []string
@@ -308,6 +309,9 @@ func LoadConfig(configFile string) Config {
 					lg.parse_from_start = v
 				case "warn_on_operation_fail":
 					lg.fail_operation_warn = v
+				case "out_of_order_time_warn":
+					lg.out_of_order_time_warn = v
+
 				default:
 					log.Fatalf("Unknown key %s.%s", name, key)
 				}
