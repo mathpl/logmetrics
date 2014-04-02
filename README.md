@@ -53,7 +53,8 @@ Here's the configuration for fictional service.  Comments inline. It's in json-l
 
     # Regular expression used to extract fields from the logs.
     # Spaces are stripped, comments are stripped, literal "\n" are necessary at the end of the line.
-    re:
+    # Multiple expressions can be defined but match groups must remain the same
+    re: [
       '([A-z]{3}\s+\d+\s+\d+:\d+:\d+)\s+                           # Date 1 \n
        (\S+)\s+                                                    # server 2, class 3,\n
        rest_([a-z]+).api:.*                                        # rest type 4 \n
@@ -63,7 +64,7 @@ Here's the configuration for fictional service.  Comments inline. It's in json-l
        \[sql:([0-9]+)/([0-9]+)\]\s+                                # sql calls 9, sql time 10 \n
        \[membase:([0-9]+)/([0-9]+)\]\s+                            # membase calls 11, membase time 12 \n
        \[memcache:([0-9]+)/([0-9]+)\]\s+                           # memcache calls 13, memcache time 14 \n
-       \[other:([0-9]+)/([0-9]+)\].*                               # other calls 15, other time 16 \n',
+       \[other:([0-9]+)/([0-9]+)\].*                               # other calls 15, other time 16 \n'],
 
     # Validation of the previous regexp.
     expected_matches: 16,
@@ -115,6 +116,7 @@ Here's the configuration for fictional service.  Comments inline. It's in json-l
           # Operations add or sub can be applied to the value. Here we substract all the
           # resource accesses from the total time so we only have the time spent on the server.
           [6,  "resource=local" , {sub: [8,10,12,14,16]}],
+          [6,  "resource=total" ],
           [8,  "resource=bnt"],
           [10,  "resource=sql"],
           [12, "resource=membase"],
@@ -129,8 +131,9 @@ Here's the configuration for fictional service.  Comments inline. It's in json-l
     histogram_alpha_decay: 0.15,
     histogram_rescale_threshold_min: 10,
 
-    #Maximum interval for EWMA calculation when no new data has been parsed for a key
-    ewma_interval: 300,
+    #Interval for EWMA calculation when no new data has been parsed for a key
+    ewma_interval: 60,
+
     #Split workload on multiple go routines to scale across cpus
     goroutines: 1,
 
@@ -142,6 +145,9 @@ Here's the configuration for fictional service.  Comments inline. It's in json-l
 
     # Log a warning when a metric operation fails (result lower than 0). Default to false.
     warn_on_operation_fail: false,
+
+    # Log a warning when an out of order time is seen in the logs. Default to false.
+    warn_on_out_of_order_time: true,
 
     # Parse log from start. Allows to push old logs, otherwise it will start at its current end of the file. Defaults to false.
     parse_from_start: false
@@ -195,16 +201,16 @@ All this information is specific to a single host. A single call generates 13 st
 <h3>Meter</h3>
 
 - <key_prefix>.<key_suffix>.count: Sum of the values.
-- <key_prefix>.<key_suffix>.rate.times1k._1min: Moving average over 1 minute multiplied by 1000 to give better precision.
-- <key_prefix>.<key_suffix>.rate.times1k._5min: Moving average over 5 minutes multiplied by 1000 to give better precision.
-- <key_prefix>.<key_suffix>.rate.times1k._15min: Moving average over 15 minutes multiplied by 1000 to give better precision.
+- <key_prefix>.<key_suffix>.rate._1min: Moving average over 1 minute.
+- <key_prefix>.<key_suffix>.rate._5min: Moving average over 5 minutes.
+- <key_prefix>.<key_suffix>.rate._15min: Moving average over 15 minutes.
 
 Example:
 ```
 rest.api.executions.count 1391745780 4 call=getUser host=api1.mynetwork class=api
-rest.api.executions.rate.times1k._1min 1391745780 0 call=getUser host=api1.mynetwork class=api
-rest.api.executions.rate.times1k._5min 1391745780 0 call=getUser host=api1.mynetwork class=api
-rest.api.executions.rate.times1k._15min 1391745780 0 call=getUser host=api1.mynetwork class=api
+rest.api.executions.rate._1min 1391745780 0.100 call=getUser host=api1.mynetwork class=api
+rest.api.executions.rate._5min 1391745780 0.050 call=getUser host=api1.mynetwork class=api
+rest.api.executions.rate._15min 1391745780 0.003 call=getUser host=api1.mynetwork class=api
 ```
 
 h3. Histogram

@@ -309,7 +309,7 @@ func LoadConfig(configFile string) Config {
 					lg.parse_from_start = v
 				case "warn_on_operation_fail":
 					lg.fail_operation_warn = v
-				case "out_of_order_time_warn":
+				case "warn_on_out_of_order_time":
 					lg.out_of_order_time_warn = v
 
 				default:
