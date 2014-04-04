@@ -3,18 +3,23 @@ package logmetrics
 import (
 	"github.com/ActiveState/tail"
 	//	"github.com/deckarep/golang-set"
+	"fmt"
 	"log"
+	"path"
 	"path/filepath"
 	"time"
 )
 
-func tailFile(channel_number int, filename string, logGroup *LogGroup) {
+func tailFile(channel_number int, filename string, logGroup *LogGroup, cpuprofile string) {
 	//Recovery setup
 	//defer func() {
 	//	if r := recover(); r != nil {
 	//		log.Printf("Recovering from %s", r)
 	//	}
 	//}()
+
+	profile_routine(cpuprofile, fmt.Sprintf("tailfile_%s-%d", path.Base(filename), channel_number))
+	defer stop_profiling()
 
 	//Number of matches expected = length of the destination table + 1 (stime)
 	maxMatches := logGroup.expected_matches + 1
@@ -48,8 +53,8 @@ func tailFile(channel_number int, filename string, logGroup *LogGroup) {
 				//Decide which datapool channel to send the line to
 				//split_val := logGroup.workload_split_on + 1
 
-				logGroup.tail_data[channel_number] <- matches
 				match_one = true
+				logGroup.tail_data[channel_number] <- matches
 			}
 		}
 
@@ -60,7 +65,7 @@ func tailFile(channel_number int, filename string, logGroup *LogGroup) {
 
 	log.Printf("Finished tailling %s.", filename)
 }
-func startLogGroup(logGroup *LogGroup, pollInterval int) {
+func startLogGroup(logGroup *LogGroup, pollInterval int, cpuprofile string) {
 	log.Printf("Filename poller for %s started", logGroup.name)
 	log.Printf("Using the following regexp for log group %s: %s", logGroup.name, logGroup.strRegexp)
 
@@ -100,7 +105,7 @@ func startLogGroup(logGroup *LogGroup, pollInterval int) {
 
 			//Start tailing new files!
 			for file, _ := range newFiles {
-				go tailFile(channel_number, file, logGroup)
+				go tailFile(channel_number, file, logGroup, cpuprofile)
 				channel_number = (channel_number + 1) % logGroup.goroutines
 
 				currentFiles[file] = true
@@ -109,8 +114,8 @@ func startLogGroup(logGroup *LogGroup, pollInterval int) {
 	}
 }
 
-func StartTails(config *Config) {
+func StartTails(config *Config, cpuprofile string) {
 	for _, logGroup := range config.logGroups {
-		go startLogGroup(logGroup, config.pollInterval)
+		go startLogGroup(logGroup, config.pollInterval, cpuprofile)
 	}
 }

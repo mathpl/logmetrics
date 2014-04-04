@@ -87,6 +87,14 @@ func (conf *Config) GetPusherNumber() int {
 	return conf.pushNumber
 }
 
+func (cfg *Config) CloseChannels() {
+	for _, lg := range cfg.logGroups {
+		for _, tail_data_chan := range lg.tail_data {
+			close(tail_data_chan)
+		}
+	}
+}
+
 func cleanSre2(log_group_name string, re string) (string, *regexp.Regexp, error) {
 	//Little hack to support extended style regex. Removes comments, spaces en endline
 	noSpacesRe := strings.Replace(re, " ", "", -1)
