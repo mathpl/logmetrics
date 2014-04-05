@@ -190,12 +190,9 @@ func getHistogramKeys(name string, h timemetrics.Histogram) []string {
 	return keys
 }
 
-func (lg LogGroup) dataPoolHandler(channel_number int, tsd_pushers []chan []string, tsd_channel_number int, cpuprofile string) error {
+func (lg LogGroup) dataPoolHandler(channel_number int, tsd_pushers []chan []string, tsd_channel_number int) error {
 	dataPool := make(map[string]*tsdPoint)
 	tsd_push := tsd_pushers[tsd_channel_number]
-
-	profile_routine(cpuprofile, fmt.Sprintf("datapool_%s-%d", lg.name, channel_number))
-	defer stop_profiling()
 
 	log.Printf("Datapool[%s:%d] started. Pushing keys to TsdPusher[%d]", lg.name, channel_number, tsd_channel_number)
 
@@ -327,12 +324,12 @@ func pushStats(tsd_push chan []string, dataPool map[string]*tsdPoint) (nbKeys in
 	return
 }
 
-func StartDataPools(config *Config, tsd_pushers []chan []string, cpuprofile string) {
+func StartDataPools(config *Config, tsd_pushers []chan []string) {
 	//Start a queryHandler by log group
 	nb_tsd_push := 0
 	for _, lg := range config.logGroups {
 		for i := 0; i < lg.goroutines; i++ {
-			lg.dataPoolHandler(i, tsd_pushers, nb_tsd_push, cpuprofile)
+			lg.dataPoolHandler(i, tsd_pushers, nb_tsd_push)
 			nb_tsd_push = (nb_tsd_push + 1) % config.GetPusherNumber()
 		}
 	}

@@ -3,24 +3,18 @@ package logmetrics
 import (
 	"github.com/ActiveState/tail"
 	//	"github.com/deckarep/golang-set"
-	"fmt"
 	"log"
-	"path"
 	"path/filepath"
 	"time"
 )
 
-func tailFile(channel_number int, filename string, logGroup *LogGroup, cpuprofile string) {
+func tailFile(channel_number int, filename string, logGroup *LogGroup) {
 	//Recovery setup
 	//defer func() {
 	//	if r := recover(); r != nil {
 	//		log.Printf("Recovering from %s", r)
 	//	}
 	//}()
-
-	profile_routine(cpuprofile, fmt.Sprintf("tailfile_%s-%d", path.Base(filename), channel_number))
-	defer stop_profiling()
-
 	//Number of matches expected = length of the destination table + 1 (stime)
 	maxMatches := logGroup.expected_matches + 1
 
@@ -65,7 +59,7 @@ func tailFile(channel_number int, filename string, logGroup *LogGroup, cpuprofil
 
 	log.Printf("Finished tailling %s.", filename)
 }
-func startLogGroup(logGroup *LogGroup, pollInterval int, cpuprofile string) {
+func startLogGroup(logGroup *LogGroup, pollInterval int) {
 	log.Printf("Filename poller for %s started", logGroup.name)
 	log.Printf("Using the following regexp for log group %s: %s", logGroup.name, logGroup.strRegexp)
 
@@ -105,7 +99,7 @@ func startLogGroup(logGroup *LogGroup, pollInterval int, cpuprofile string) {
 
 			//Start tailing new files!
 			for file, _ := range newFiles {
-				go tailFile(channel_number, file, logGroup, cpuprofile)
+				go tailFile(channel_number, file, logGroup)
 				channel_number = (channel_number + 1) % logGroup.goroutines
 
 				currentFiles[file] = true
@@ -114,8 +108,8 @@ func startLogGroup(logGroup *LogGroup, pollInterval int, cpuprofile string) {
 	}
 }
 
-func StartTails(config *Config, cpuprofile string) {
+func StartTails(config *Config) {
 	for _, logGroup := range config.logGroups {
-		go startLogGroup(logGroup, config.pollInterval, cpuprofile)
+		go startLogGroup(logGroup, config.pollInterval)
 	}
 }

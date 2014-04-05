@@ -15,7 +15,6 @@ var configFile = flag.String("c", "/etc/logmetrics_collector.conf", "Full path t
 var threads = flag.Int("j", 1, "Thread count.")
 var logToConsole = flag.Bool("d", false, "Print to console.")
 var doNotSend = flag.Bool("D", false, "Do not send data out to TSD.")
-var cpuprofile = flag.String("cpuprofile", "", "write cpu profiles to file prefix")
 
 func main() {
 	//Process execution flags
@@ -56,7 +55,7 @@ func main() {
 	}
 
 	//Start log tails
-	logmetrics.StartTails(&config, *cpuprofile)
+	logmetrics.StartTails(&config)
 
 	//Start he out channels
 	tsd_pushers := make([]chan []string, config.GetPusherNumber())
@@ -65,16 +64,11 @@ func main() {
 	}
 
 	//Start datapools
-	logmetrics.StartDataPools(&config, tsd_pushers, *cpuprofile)
+	logmetrics.StartDataPools(&config, tsd_pushers)
 
 	//Start TSD pusher
 	logmetrics.StartTsdPushers(&config, tsd_pushers, *doNotSend)
 
 	//Block until we're told to stop
 	<-stop
-
-	config.CloseChannels()
-	for _, tsd_pusher := range tsd_pushers {
-		close(tsd_pusher)
-	}
 }
