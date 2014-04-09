@@ -62,7 +62,7 @@ func StartTsdPushers(config *Config, tsd_pushers []chan []string, doNotSend bool
 
 		tsd_push := tsd_pushers[channel_number]
 		go func() {
-			//defer conn.Close()
+			defer conn.Close()
 
 			key_push_stats := keyPushStats{last_report: time.Now()}
 
@@ -84,7 +84,6 @@ func StartTsdPushers(config *Config, tsd_pushers []chan []string, doNotSend bool
 
 			for keys := range tsd_push {
 				for _, key := range keys {
-
 					var sentOk = false
 					for !sentOk {
 						var line string

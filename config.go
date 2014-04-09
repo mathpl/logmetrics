@@ -8,9 +8,7 @@ import (
 	"os"
 	"strings"
 	//"syseng/sre2"
-	//"regexp"
-	"errors"
-	"github.com/glenn-brown/golang-pkg-pcre/src/pkg/pcre"
+	"regexp"
 	"time"
 )
 
@@ -40,7 +38,7 @@ type KeyExtract struct {
 type LogGroup struct {
 	name             string
 	globFiles        []string
-	re               []*pcre.Regexp
+	re               []*regexp.Regexp
 	strRegexp        []string
 	expected_matches int
 
@@ -89,7 +87,7 @@ func (conf *Config) GetPusherNumber() int {
 	return conf.pushNumber
 }
 
-func cleanSre2(log_group_name string, re string) (string, *pcre.Regexp, error) {
+func cleanSre2(log_group_name string, re string) (string, *regexp.Regexp, error) {
 	//Little hack to support extended style regex. Removes comments, spaces en endline
 	noSpacesRe := strings.Replace(re, " ", "", -1)
 	splitRe := strings.Split(noSpacesRe, "\\n")
@@ -102,10 +100,10 @@ func cleanSre2(log_group_name string, re string) (string, *pcre.Regexp, error) {
 	cleanRe := strings.Join(rebuiltRe, "")
 
 	//Try to compile the regex
-	if compiledRe, err := pcre.Compile(cleanRe, 0); err == nil {
-		return cleanRe, &compiledRe, nil
+	if compiledRe, err := regexp.Compile(cleanRe); err == nil {
+		return cleanRe, compiledRe, nil
 	} else {
-		return "", nil, errors.New(err.Message)
+		return "", nil, err
 	}
 }
 
@@ -322,7 +320,7 @@ func LoadConfig(configFile string) Config {
 				switch key {
 				case "re":
 					var err error
-					lg.re = make([]*pcre.Regexp, len(v))
+					lg.re = make([]*regexp.Regexp, len(v))
 					lg.strRegexp = make([]string, len(v))
 					for i, re := range v {
 						if lg.strRegexp[i], lg.re[i], err = cleanSre2(lg.name, re.(string)); err != nil {
