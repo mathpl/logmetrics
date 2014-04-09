@@ -59,6 +59,7 @@ func tailFile(channel_number int, filename string, logGroup *LogGroup) {
 
 	log.Printf("Finished tailling %s.", filename)
 }
+
 func startLogGroup(logGroup *LogGroup, pollInterval int) {
 	log.Printf("Filename poller for %s started", logGroup.name)
 	log.Printf("Using the following regexp for log group %s: %s", logGroup.name, logGroup.strRegexp)
