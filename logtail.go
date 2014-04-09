@@ -3,12 +3,32 @@ package logmetrics
 import (
 	"github.com/ActiveState/tail"
 	//	"github.com/deckarep/golang-set"
+	"github.com/glenn-brown/golang-pkg-pcre/src/pkg/pcre"
 	"log"
 	"path/filepath"
 	"time"
 )
 
-func tailFile(channel_number int, filename string, logGroup *LogGroup) {
+func buildMatches(line string, m *pcre.Matcher) []string {
+	mlen := m.Groups() + 1
+
+	//fmt.Printf("capture: %v\n", capture)
+	if m.Matches() && mlen > 0 {
+		captured_texts := make([]string, mlen)
+		captured_texts[0] = line
+		for i := 1; i < mlen; i++ {
+			group := m.GroupString(i)
+			captured_texts[i] = group
+		}
+
+		//log.Printf("%d %+V", mlen, captured_texts)
+		return captured_texts
+	} else {
+		return nil
+	}
+}
+
+func tailFile(channel_number int, filename string, lg *LogGroup) {
 	//Recovery setup
 	//defer func() {
 	//	if r := recover(); r != nil {
@@ -16,11 +36,11 @@ func tailFile(channel_number int, filename string, logGroup *LogGroup) {
 	//	}
 	//}()
 	//Number of matches expected = length of the destination table + 1 (stime)
-	maxMatches := logGroup.expected_matches + 1
+	maxMatches := lg.expected_matches + 1
 
 	//os.Seek end of file descriptor
 	seekParam := 2
-	if logGroup.parse_from_start {
+	if lg.parse_from_start {
 		seekParam = 0
 	}
 
@@ -31,7 +51,13 @@ func tailFile(channel_number int, filename string, logGroup *LogGroup) {
 		log.Fatalf("Unable to tail %s: %s", filename, err)
 		return
 	}
-	log.Printf("Tailing %s data to datapool[%s:%d]", filename, logGroup.name, channel_number)
+	log.Printf("Tailing %s data to datapool[%s:%d]", filename, lg.name, channel_number)
+
+	//Prepare matchers
+	//matchers := make([]*pcre.Matchers,len(lg.re))
+	//for i, re := range lg.re {
+	//	matchers[i] = re.MatcherString()
+	//}
 
 	//FIXME: Bug in ActiveTail can get partial lines
 	for line := range tail.Lines {
@@ -42,17 +68,22 @@ func tailFile(channel_number int, filename string, logGroup *LogGroup) {
 
 		//Test out all the regexp, pick the first one that matches
 		match_one := false
-		for _, re := range logGroup.re {
-			if matches := re.FindStringSubmatch(line.Text); len(matches) == maxMatches {
+		for _, re := range lg.re {
+			m := re.MatcherString(line.Text, 0)
+			matches := buildMatches(line.Text, m)
+			//if matches != nil {
+			//	log.Printf("%d == %d :: %+V", len(matches), maxMatches, matches)
+			//}
+			if len(matches) == maxMatches {
 				//Decide which datapool channel to send the line to
 				//split_val := logGroup.workload_split_on + 1
 
 				match_one = true
-				logGroup.tail_data[channel_number] <- matches
+				lg.tail_data[channel_number] <- matches
 			}
 		}
 
-		if logGroup.fail_regex_warn && !match_one {
+		if lg.fail_regex_warn && !match_one {
 			log.Printf("Regexp match failed on %s, expected %d matches: %s", filename, maxMatches, line.Text)
 		}
 	}
