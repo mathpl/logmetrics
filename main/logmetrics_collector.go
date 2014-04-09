@@ -55,7 +55,7 @@ func main() {
 	}
 
 	//Start log tails
-	logmetrics.StartTails(&config, false)
+	logmetrics.StartTails(&config)
 
 	//Start he out channels
 	tsd_pushers := make([]chan []string, config.GetPusherNumber())
