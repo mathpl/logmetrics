@@ -56,7 +56,7 @@ func parserTest(filename string, logGroup *LogGroup, perfInfo bool) {
 		//Test out all the regexp, pick the first one that matches
 		match_one := false
 		for _, re := range logGroup.re {
-           if matches := re.FindStringSubmatch(line.Text); len(matches) == maxMatches {
+           if matches := re.FindStringSubmatch(line); len(matches) == maxMatches {
 				match_one = true
 			}
 		}
