@@ -54,14 +54,14 @@ func main() {
 		log.SetOutput(logger)
 	}
 
-	//Start log tails
-	logmetrics.StartTails(&config)
-
 	//Start he out channels
 	tsd_pushers := make([]chan []string, config.GetPusherNumber())
 	for i := 0; i < config.GetPusherNumber(); i++ {
 		tsd_pushers[i] = make(chan []string, 1000)
 	}
+
+	//Start log tails
+	logmetrics.StartTails(&config, tsd_pushers)
 
 	//Start datapools
 	logmetrics.StartDataPools(&config, tsd_pushers)

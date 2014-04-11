@@ -1,41 +1,55 @@
 package logmetrics
 
 import (
+	"fmt"
 	"github.com/ActiveState/tail"
-	//	"github.com/deckarep/golang-set"
-	"github.com/glenn-brown/golang-pkg-pcre/src/pkg/pcre"
 	"log"
 	"path/filepath"
 	"time"
 )
 
-func buildMatches(line string, m *pcre.Matcher) []string {
-	mlen := m.Groups() + 1
-
-	//fmt.Printf("capture: %v\n", capture)
-	if m.Matches() && mlen > 0 {
-		captured_texts := make([]string, mlen)
-		captured_texts[0] = line
-		for i := 1; i < mlen; i++ {
-			group := m.GroupString(i)
-			captured_texts[i] = group
-		}
-
-		//log.Printf("%d %+V", mlen, captured_texts)
-		return captured_texts
-	} else {
-		return nil
-	}
+type tailStats struct {
+	line_read   int64
+	byte_read   int64
+	line_match  int64
+	last_report time.Time
+	hostname    string
+	filename    string
+	log_group   string
+	interval    int
 }
 
-func tailFile(channel_number int, filename string, lg *LogGroup) {
-	//Recovery setup
-	//defer func() {
-	//	if r := recover(); r != nil {
-	//		log.Printf("Recovering from %s", r)
-	//	}
-	//}()
-	//Number of matches expected = length of the destination table + 1 (stime)
+func (ts *tailStats) isTimeForStats() bool {
+	return time.Now().Sub(ts.last_report) > time.Duration(ts.interval)*time.Second
+}
+
+func (ts *tailStats) incLineMatch() {
+	ts.line_match++
+}
+
+func (ts *tailStats) incLine(line string) {
+	ts.line_read++
+	ts.byte_read += int64(len(line))
+}
+
+func (ts *tailStats) getTailStatsKey() []string {
+	t := time.Now()
+
+	ts.last_report = t
+
+	line := make([]string, 3)
+	line[0] = fmt.Sprintf("logmetrics_collector.tail.line_read %d %d host=%s log_group=%s filename=%s", t.Unix(), ts.line_read, ts.hostname, ts.log_group, ts.filename)
+	line[1] = fmt.Sprintf("logmetrics_collector.tail.byte_read %d %d host=%s log_group=%s filename=%s", t.Unix(), ts.byte_read, ts.hostname, ts.log_group, ts.filename)
+	line[2] = fmt.Sprintf("logmetrics_collector.tail.match %d %d host=%s log_group=%s filename=%s", t.Unix(), ts.line_match, ts.hostname, ts.log_group, ts.filename)
+
+	return line
+
+}
+
+func tailFile(channel_number int, filename string, lg *LogGroup, tsd_pusher chan []string) {
+	tail_stats := tailStats{last_report: time.Now(), hostname: getHostname(),
+		filename: filename, log_group: lg.name, interval: lg.interval}
+
 	maxMatches := lg.expected_matches + 1
 
 	//os.Seek end of file descriptor
@@ -53,12 +67,6 @@ func tailFile(channel_number int, filename string, lg *LogGroup) {
 	}
 	log.Printf("Tailing %s data to datapool[%s:%d]", filename, lg.name, channel_number)
 
-	//Prepare matchers
-	//matchers := make([]*pcre.Matchers,len(lg.re))
-	//for i, re := range lg.re {
-	//	matchers[i] = re.MatcherString()
-	//}
-
 	//FIXME: Bug in ActiveTail can get partial lines
 	for line := range tail.Lines {
 		if line.Err != nil {
@@ -70,28 +78,30 @@ func tailFile(channel_number int, filename string, lg *LogGroup) {
 		match_one := false
 		for _, re := range lg.re {
 			m := re.MatcherString(line.Text, 0)
-			matches := buildMatches(line.Text, m)
-			//if matches != nil {
-			//	log.Printf("%d == %d :: %+V", len(matches), maxMatches, matches)
-			//}
+			matches := m.Extract()
 			if len(matches) == maxMatches {
-				//Decide which datapool channel to send the line to
-				//split_val := logGroup.workload_split_on + 1
-
 				match_one = true
 				lg.tail_data[channel_number] <- matches
+				tail_stats.incLineMatch()
+				break
 			}
 		}
 
+		tail_stats.incLine(line.Text)
+
 		if lg.fail_regex_warn && !match_one {
 			log.Printf("Regexp match failed on %s, expected %d matches: %s", filename, maxMatches, line.Text)
+		}
+
+		if (tail_stats.line_read%1000) == 0 && tail_stats.isTimeForStats() {
+			tsd_pusher <- tail_stats.getTailStatsKey()
 		}
 	}
 
 	log.Printf("Finished tailling %s.", filename)
 }
 
-func startLogGroup(logGroup *LogGroup, pollInterval int) {
+func startLogGroup(logGroup *LogGroup, pollInterval int, tsd_pushers []chan []string, push_number int) {
 	log.Printf("Filename poller for %s started", logGroup.name)
 	log.Printf("Using the following regexp for log group %s: %s", logGroup.name, logGroup.strRegexp)
 
@@ -106,6 +116,7 @@ func startLogGroup(logGroup *LogGroup, pollInterval int) {
 
 	currentFiles := make(map[string]bool)
 	channel_number := 0
+	pusher_channel_number := 0
 	for {
 		select {
 		case <-rescanFiles:
@@ -131,8 +142,9 @@ func startLogGroup(logGroup *LogGroup, pollInterval int) {
 
 			//Start tailing new files!
 			for file, _ := range newFiles {
-				go tailFile(channel_number, file, logGroup)
+				go tailFile(channel_number, file, logGroup, tsd_pushers[pusher_channel_number])
 				channel_number = (channel_number + 1) % logGroup.goroutines
+				pusher_channel_number = (pusher_channel_number + 1) % push_number
 
 				currentFiles[file] = true
 			}
@@ -140,8 +152,8 @@ func startLogGroup(logGroup *LogGroup, pollInterval int) {
 	}
 }
 
-func StartTails(config *Config) {
+func StartTails(config *Config, tsd_pushers []chan []string) {
 	for _, logGroup := range config.logGroups {
-		go startLogGroup(logGroup, config.pollInterval)
+		go startLogGroup(logGroup, config.pollInterval, tsd_pushers, config.GetPusherNumber())
 	}
 }

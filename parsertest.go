@@ -63,7 +63,8 @@ func parserTest(filename string, logGroup *LogGroup, perfInfo bool) {
 		match_one := false
 		for _, re := range logGroup.re {
 			m := re.MatcherString(line, 0)
-			matches := buildMatches(line, m)
+			matches := m.Extract()
+			//matches := buildMatches(line, m)
 			if len(matches) == maxMatches {
 
 				match_one = true

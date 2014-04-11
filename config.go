@@ -1,16 +1,15 @@
 package logmetrics
 
 import (
+	"errors"
+	"fmt"
+	"github.com/mathpl/golang-pkg-pcre/src/pkg/pcre"
 	"io/ioutil"
 	"launchpad.net/~niemeyer/goyaml/beta"
 	"log"
 	"log/syslog"
 	"os"
 	"strings"
-	//"syseng/sre2"
-	//"regexp"
-	"errors"
-	"github.com/glenn-brown/golang-pkg-pcre/src/pkg/pcre"
 	"time"
 )
 
@@ -87,6 +86,19 @@ func (lg *LogGroup) getNbKeys() int {
 
 func (conf *Config) GetPusherNumber() int {
 	return conf.pushNumber
+}
+func (conf *Config) GetTsdTarget() string {
+	return fmt.Sprintf("%s:%d", conf.pushHost, conf.pushPort)
+}
+
+func getHostname() string {
+	//Get hostname
+	hostname, err := os.Hostname()
+	if err != nil {
+		log.Fatalf("Unable to get hostname: ", err)
+	}
+
+	return hostname
 }
 
 func cleanSre2(log_group_name string, re string) (string, *pcre.Regexp, error) {
