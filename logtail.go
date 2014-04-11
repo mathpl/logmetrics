@@ -60,7 +60,7 @@ func tailFile(channel_number int, filename string, lg *LogGroup, tsd_pusher chan
 
 	loc := tail.SeekInfo{0, seekParam}
 
-	tail, err := tail.TailFile(filename, tail.Config{Location: &loc, Follow: true, ReOpen: true, Poll: true})
+	tail, err := tail.TailFile(filename, tail.Config{Location: &loc, Follow: true, ReOpen: true, Poll: false})
 	if err != nil {
 		log.Fatalf("Unable to tail %s: %s", filename, err)
 		return
