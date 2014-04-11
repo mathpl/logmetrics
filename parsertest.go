@@ -10,26 +10,31 @@ import (
 )
 
 type readStats struct {
-	key_pushed  int64
-	byte_pushed int64
-	last_report time.Time
+	line_read    int64
+	line_matched int64
+	byte_pushed  int64
+	last_report  time.Time
 }
 
-func (f *readStats) inc(data_read int) {
-	f.key_pushed++
+func (f *readStats) inc(matched bool, data_read int) {
+	f.line_read++
+	if matched {
+		f.line_matched++
+	}
 	f.byte_pushed += int64(data_read)
 }
 
 func (f *readStats) getStats() string {
-	line_sec := int(f.key_pushed / int64(time.Now().Sub(f.last_report)/time.Second))
+	line_sec := int(f.line_read / int64(time.Now().Sub(f.last_report)/time.Second))
+	match_sec := int(f.line_matched / int64(time.Now().Sub(f.last_report)/time.Second))
 	mbyte_sec := float64(f.byte_pushed) / 1024 / 1024 / float64(time.Now().Sub(f.last_report)/time.Second)
 
-	f.key_pushed = 0
+	f.line_read = 0
 	f.byte_pushed = 0
 	f.last_report = time.Now()
 
-	return fmt.Sprintf("%d line/s. %.3f Mb/s.",
-		line_sec, mbyte_sec)
+	return fmt.Sprintf("%d line/s. %d match/s %.3f Mb/s.",
+		line_sec, match_sec, mbyte_sec)
 }
 
 func (f *readStats) isTimeForStats(interval int) bool {
@@ -56,21 +61,21 @@ func parserTest(filename string, logGroup *LogGroup, perfInfo bool) {
 		//Test out all the regexp, pick the first one that matches
 		match_one := false
 		for _, re := range logGroup.re {
-           if matches := re.FindStringSubmatch(line); len(matches) == maxMatches {
+			m := re.MatcherString(line, 0)
+			matches := buildMatches(line, m)
+			if len(matches) == maxMatches {
 				match_one = true
 			}
 		}
 
-		if match_one {
-			read_stats.inc(len(line))
-		}
+		read_stats.inc(match_one, len(line))
 
-		if read_stats.isTimeForStats(5) {
+		if read_stats.isTimeForStats(1) {
 			log.Print(read_stats.getStats())
 		}
 	}
 
-	log.Printf("Finished tailling %s.", filename)
+	log.Printf("Finished parsing %s.", filename)
 }
 
 func startLogGroupParserTest(logGroup *LogGroup, perfInfo bool) {
