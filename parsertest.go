@@ -30,10 +30,11 @@ func (f *readStats) getStats() string {
 	mbyte_sec := float64(f.byte_pushed) / 1024 / 1024 / float64(time.Now().Sub(f.last_report)/time.Second)
 
 	f.line_read = 0
+	f.line_matched = 0
 	f.byte_pushed = 0
 	f.last_report = time.Now()
 
-	return fmt.Sprintf("%d line/s. %d match/s %.3f Mb/s.",
+	return fmt.Sprintf("%d line/s  %d match/s  %.3f Mb/s.",
 		line_sec, match_sec, mbyte_sec)
 }
 
@@ -61,9 +62,7 @@ func parserTest(filename string, logGroup *LogGroup, perfInfo bool) {
 		//Test out all the regexp, pick the first one that matches
 		match_one := false
 		for _, re := range logGroup.re {
-			m := re.MatcherString(line, 0)
-			matches := buildMatches(line, m)
-			if len(matches) == maxMatches {
+			if matches := re.FindStringSubmatch(line); len(matches) == maxMatches {
 				match_one = true
 			}
 		}
