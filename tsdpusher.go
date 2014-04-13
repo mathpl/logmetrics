@@ -36,7 +36,7 @@ func (f *keyPushStats) isTimeForStats() bool {
 	return time.Now().Sub(f.last_report) > time.Duration(f.interval)*time.Second
 }
 
-func writeLine(config *Config, doNotSend bool, conn net.Conn, line string) int {
+func writeLine(config *Config, doNotSend bool, conn net.Conn, line string) (int, net.Conn) {
 	if config.pushType == "tsd" {
 		line = ("put " + line + "\n")
 	} else {
@@ -50,35 +50,34 @@ func writeLine(config *Config, doNotSend bool, conn net.Conn, line string) int {
 	if doNotSend {
 		fmt.Print(line)
 	} else {
-		for err != nil {
-			if conn != nil {
-				_, err = conn.Write(byte_line)
-			}
-
-			if err != nil {
-				log.Printf("Error writting data: %s", err)
-				if conn != nil {
-					conn.Close()
-					conn = nil
-				}
-			}
-
+		for {
 			//Reconnect if needed
 			if conn == nil {
 				target := config.GetTsdTarget()
-				time.Sleep(time.Duration(config.pushWait) * time.Second)
 				log.Printf("Reconnecting to %s", target)
+
 				if conn, err = net.Dial(config.pushProto, target); err != nil {
 					log.Printf("Unable to reconnect: %s", err)
-
-				} else {
-					log.Printf("Reconnected")
 				}
 			}
+
+			if conn != nil {
+				_, err = conn.Write(byte_line)
+
+				if err != nil {
+					log.Printf("Error writting data: %s", err)
+					conn.Close()
+					conn = nil
+					time.Sleep(time.Duration(config.pushWait) * time.Second)
+				} else {
+					break
+				}
+			}
+
 		}
 	}
 
-	return byte_written
+	return byte_written, conn
 }
 
 func StartTsdPushers(config *Config, tsd_pushers []chan []string, doNotSend bool) {
@@ -87,17 +86,6 @@ func StartTsdPushers(config *Config, tsd_pushers []chan []string, doNotSend bool
 	}
 
 	hostname := getHostname()
-	//Open a connection to local push instance
-	var conn net.Conn
-	var err error
-	if !doNotSend {
-		target := config.GetTsdTarget()
-		conn, err = net.Dial(config.pushProto, target)
-		defer conn.Close()
-		if err != nil && !doNotSend {
-			log.Fatalf("Unable to connect to push on %s: %s", target, err)
-		}
-	}
 
 	for i, _ := range tsd_pushers {
 		channel_number := i
@@ -107,7 +95,6 @@ func StartTsdPushers(config *Config, tsd_pushers []chan []string, doNotSend bool
 
 		tsd_push := tsd_pushers[channel_number]
 		go func() {
-
 			key_push_stats := keyPushStats{last_report: time.Now(), hostname: hostname, interval: config.stats_wait}
 
 			//Check if TSD has something to say
@@ -126,16 +113,18 @@ func StartTsdPushers(config *Config, tsd_pushers []chan []string, doNotSend bool
 			//	}()
 			//}
 
+			var conn net.Conn
 			for keys := range tsd_push {
 				for _, line := range keys {
-					bytes_written := writeLine(config, doNotSend, conn, line)
+					var bytes_written int
+					bytes_written, conn = writeLine(config, doNotSend, conn, line)
 
 					key_push_stats.inc(bytes_written)
 
 					//Stats on key pushed, limit checks with modulo (now() is a syscall)
 					if (key_push_stats.key_pushed%10000) == 0 && key_push_stats.isTimeForStats() {
 						for _, local_line := range key_push_stats.getLine() {
-							bytes_written = writeLine(config, doNotSend, conn, local_line)
+							bytes_written, conn = writeLine(config, doNotSend, conn, local_line)
 							key_push_stats.inc(bytes_written)
 						}
 					}
