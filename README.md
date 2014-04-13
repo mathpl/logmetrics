@@ -263,7 +263,7 @@ Additionnaly all internal processing keys have the current host's hostname tag a
 
 <h2>Internal structure</h2>
 
-One of the reason Go was used was the concept of goroutines and channels. A goroutine is a lightweight threads managed by go itself. Go will schedule/unschedule these onto real system thread for execution. They are very cheap, using only 8k of memory each. A Go program as the choice of the number of real thread it will use, thus making program with workload distributed one multiple goroutines easily scalable on any number of processors.
+One of the reason Go was used was the concept of goroutines and channels. A goroutine is a lightweight threads managed by go itself. Go will schedule/unschedule these onto real system thread for execution. They are very cheap, using only 8k of memory each. A Go program has the choice of the number of real thread it will use, thus making program with workload distributed one multiple goroutines easily scalable on any number of processors.
 
 Channels are a way to communicate between goroutines that's safer and easier to read than mutexes. Think of it as a pipe between threads that can be buffered, where operations are atomic and will block when writing when it's full or reading when it's empty. In the case of logmetrics-collector this enable stream processing of the log lines. Thus we have:
 
