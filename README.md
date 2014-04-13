@@ -212,7 +212,7 @@ rest.api.executions.rate._5min 1391745780 0.050 call=getUser host=api1.mynetwork
 rest.api.executions.rate._15min 1391745780 0.003 call=getUser host=api1.mynetwork class=api
 ```
 
-h3. Histogram
+<h3>Histogram</h3>
 
 - \<key_prefix>.\<key_suffix>.min: Minimum in the sample.
 - \<key_prefix>.\<key_suffix>.max: Maximum in the sample.
@@ -239,7 +239,7 @@ rest.api.execution_time.ms.p999 1391745767 16 call=getUser host=api1.mynetwork c
 rest.api.execution_time.ms.sample_size 1391745767 3 call=getUser host=api1.mynetwork class=api
 ```
 
-h3. Internal processing metrics
+<h3>Internal processing metrics</h3>
 
 It will also push internal processing stats under the following keys and tags:
 - logmetrics_collector.tail.line_read: Number of line read
@@ -261,7 +261,7 @@ It will also push internal processing stats under the following keys and tags:
 
 Additionnaly all internal processing keys have the current host's hostname tag added.
 
-h2. Internal structure
+<h2>Internal structure</h2>
 
 One of the reason Go was used was the concept of goroutines and channels. A goroutine is a lightweight threads managed by go itself. Go will schedule/unschedule these onto real system thread for execution. They are very cheap, using only 8k of memory each. A Go program as the choice of the number of real thread it will use, thus making program with workload distributed one multiple goroutines easily scalable on any number of processors.
 
