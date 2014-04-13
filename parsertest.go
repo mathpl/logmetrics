@@ -42,8 +42,8 @@ func (f *readStats) isTimeForStats(interval int) bool {
 	return (time.Now().Sub(f.last_report) > time.Duration(interval)*time.Second)
 }
 
-func parserTest(filename string, logGroup *LogGroup, perfInfo bool) {
-	maxMatches := logGroup.expected_matches + 1
+func parserTest(filename string, lg *LogGroup, perfInfo bool) {
+	maxMatches := lg.expected_matches + 1
 
 	file, err := os.Open(filename)
 	if err != nil {
@@ -61,7 +61,7 @@ func parserTest(filename string, logGroup *LogGroup, perfInfo bool) {
 
 		//Test out all the regexp, pick the first one that matches
 		match_one := false
-		for _, re := range logGroup.re {
+		for _, re := range lg.re {
 			m := re.MatcherString(line, 0)
 			matches := m.Extract()
 			//matches := buildMatches(line, m)
@@ -74,7 +74,7 @@ func parserTest(filename string, logGroup *LogGroup, perfInfo bool) {
 		read_stats.inc(match_one, len(line))
 
 		if lg.fail_regex_warn && !match_one {
-			log.Printf("Regexp match failed on %s, expected %d matches: %s", filename, maxMatches, line.Text)
+			log.Printf("Regexp match failed on %s, expected %d matches: %s", filename, maxMatches, line)
 		}
 
 		if read_stats.isTimeForStats(1) {
