@@ -73,6 +73,10 @@ func parserTest(filename string, logGroup *LogGroup, perfInfo bool) {
 
 		read_stats.inc(match_one, len(line))
 
+		if lg.fail_regex_warn && !match_one {
+			log.Printf("Regexp match failed on %s, expected %d matches: %s", filename, maxMatches, line.Text)
+		}
+
 		if read_stats.isTimeForStats(1) {
 			log.Print(read_stats.getStats())
 		}
