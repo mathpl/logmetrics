@@ -8,11 +8,12 @@ import (
 )
 
 type keyPushStats struct {
-	key_pushed  int64
-	byte_pushed int64
-	last_report time.Time
-	hostname    string
-	interval    int
+	key_pushed     int64
+	byte_pushed    int64
+	last_report    time.Time
+	hostname       string
+	interval       int
+	channel_number int
 }
 
 func (f *keyPushStats) inc(data_written int) {
@@ -26,8 +27,8 @@ func (f *keyPushStats) getLine() []string {
 	f.last_report = t
 
 	line := make([]string, 2)
-	line[0] = fmt.Sprintf("logmetrics_collector.pusher.key_sent %d %d host=%s", t.Unix(), f.key_pushed, f.hostname)
-	line[1] = fmt.Sprintf("logmetrics_collector.pusher.byte_sent %d %d host=%s", t.Unix(), f.byte_pushed, f.hostname)
+	line[0] = fmt.Sprintf("logmetrics_collector.pusher.key_sent %d %d host=%s pusher_number=%d", t.Unix(), f.key_pushed, f.hostname, f.pusher_number)
+	line[1] = fmt.Sprintf("logmetrics_collector.pusher.byte_sent %d %d host=%s pusher_number=%d", t.Unix(), f.byte_pushed, f.hostname, f.pusher_number)
 
 	return line
 }
@@ -96,7 +97,7 @@ func StartTsdPushers(config *Config, tsd_pushers []chan []string, doNotSend bool
 
 		tsd_push := tsd_pushers[channel_number]
 		go func() {
-			key_push_stats := keyPushStats{last_report: time.Now(), hostname: hostname, interval: config.stats_wait}
+			key_push_stats := keyPushStats{last_report: time.Now(), hostname: hostname, interval: config.stats_wait, channel_number: channel_number}
 
 			//Check if TSD has something to say
 			//if config.pushType == "tsd" {

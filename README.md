@@ -21,7 +21,6 @@ Distribution of minimum time spent by resource for calls + total time spent (sum
 ![](images/min-distribution-of-time-by-resource.png)
 
 
-
 <h2>Features list</h2>
 
 - Generic: everything is in the configuration file..
@@ -240,7 +239,29 @@ rest.api.execution_time.ms.p999 1391745767 16 call=getUser host=api1.mynetwork c
 rest.api.execution_time.ms.sample_size 1391745767 3 call=getUser host=api1.mynetwork class=api
 ```
 
-h2. Internals
+h3. Internal processing metrics
+
+It will also push internal processing stats under the following keys and tags:
+- logmetrics_collector.tail.line_read: Number of line read
+  - log_group: log_group name
+  - filename: filename tailed
+- logmetrics_collector.tail.match: Number of line matched by regex
+  - log_group: log_group name
+  - filename: filename tailed
+- logmetrics_collector.tail.byte_read: Amount of bytes read from file
+  - log_group: log_group name
+  - filename: filename tailed
+- logmetrics_collector.data_pool.key_tracked: Number of keys tracked by a data pool.
+  - log_group: log_group name
+  - log_group_number: log_group number when multiple goroutines are used
+- logmetrics_collector.pusher.key_sent
+  - pusher_number: pusher number when multiple ones are used.
+- logmetrics_collector.pusher.byte_sent
+  - pusher_number: pusher number when multiple ones are used.
+
+Additionnaly all internal processing keys have the current host's hostname tag added.
+
+h2. Internal structure
 
 One of the reason Go was used was the concept of goroutines and channels. A goroutine is a lightweight threads managed by go itself. Go will schedule/unschedule these onto real system thread for execution. They are very cheap, using only 8k of memory each. A Go program as the choice of the number of real thread it will use, thus making program with workload distributed one multiple goroutines easily scalable on any number of processors.
 
