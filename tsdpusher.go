@@ -8,12 +8,12 @@ import (
 )
 
 type keyPushStats struct {
-	key_pushed     int64
-	byte_pushed    int64
-	last_report    time.Time
-	hostname       string
-	interval       int
-	channel_number int
+	key_pushed    int64
+	byte_pushed   int64
+	last_report   time.Time
+	hostname      string
+	interval      int
+	pusher_number int
 }
 
 func (f *keyPushStats) inc(data_written int) {
@@ -97,7 +97,7 @@ func StartTsdPushers(config *Config, tsd_pushers []chan []string, doNotSend bool
 
 		tsd_push := tsd_pushers[channel_number]
 		go func() {
-			key_push_stats := keyPushStats{last_report: time.Now(), hostname: hostname, interval: config.stats_wait, channel_number: channel_number}
+			key_push_stats := keyPushStats{last_report: time.Now(), hostname: hostname, interval: config.stats_wait, pusher_number: channel_number}
 
 			//Check if TSD has something to say
 			//if config.pushType == "tsd" {
