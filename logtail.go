@@ -2,7 +2,7 @@ package logmetrics
 
 import (
 	"fmt"
-	"github.com/mathpl/tail"
+	"github.com/ActiveState/tail"
 	"log"
 	"path/filepath"
 	"time"
