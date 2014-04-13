@@ -58,6 +58,7 @@ func writeLine(config *Config, doNotSend bool, conn net.Conn, line string) (int,
 
 				if conn, err = net.Dial(config.pushProto, target); err != nil {
 					log.Printf("Unable to reconnect: %s", err)
+					time.Sleep(time.Duration(config.pushWait) * time.Second)
 				}
 			}
 
