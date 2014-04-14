@@ -97,7 +97,7 @@ func StartTsdPushers(config *Config, tsd_pushers []chan []string, doNotSend bool
 
 		tsd_push := tsd_pushers[channel_number]
 		go func() {
-			key_push_stats := keyPushStats{last_report: time.Now(), hostname: hostname, interval: config.stats_wait, pusher_number: channel_number}
+			key_push_stats := keyPushStats{last_report: time.Now(), hostname: hostname, interval: config.stats_interval, pusher_number: channel_number}
 
 			//Check if TSD has something to say
 			//if config.pushType == "tsd" {

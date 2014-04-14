@@ -14,16 +14,17 @@ import (
 )
 
 type Config struct {
-	pollInterval int
-	pushPort     int
-	pushWait     int
-	pushHost     string
-	pushProto    string
-	pushType     string
-	pushNumber   int
-	stats_wait   int
-	logGroups    map[string]*LogGroup
-	logFacility  syslog.Priority
+	pollInterval   int
+	pushPort       int
+	pushWait       int
+	pushHost       string
+	pushProto      string
+	pushType       string
+	pushNumber     int
+	stats_interval int
+	logFacility    syslog.Priority
+
+	logGroups map[string]*LogGroup
 }
 
 type KeyExtract struct {
@@ -54,10 +55,11 @@ type LogGroup struct {
 	histogram_alpha_decay           float64
 	histogram_rescale_threshold_min int
 	ewma_interval                   int
+	stale_treshold_min              int
 
-	goroutines        int
-	workload_split_on int
-	interval          int
+	goroutines int
+	interval   int
+	poll_file  bool
 
 	fail_operation_warn    bool
 	fail_regex_warn        bool
@@ -206,8 +208,8 @@ func LoadConfig(configFile string) Config {
 				cfg.pushWait = v
 			case "push_number":
 				cfg.pushNumber = v
-			case "stats_wait":
-				cfg.stats_wait = v
+			case "stats_interval":
+				cfg.stats_interval = v
 
 			default:
 				log.Fatalf("Unknown key settings.%s", key)
@@ -257,8 +259,8 @@ func LoadConfig(configFile string) Config {
 	if cfg.pushNumber == 0 {
 		cfg.pushNumber = 1
 	}
-	if cfg.stats_wait == 0 {
-		cfg.stats_wait = 60
+	if cfg.stats_interval == 0 {
+		cfg.stats_interval = 60
 	}
 
 	//Log_groups configs
@@ -299,8 +301,8 @@ func LoadConfig(configFile string) Config {
 					lg.goroutines = v
 				case "histogram_rescale_threshold_min":
 					lg.histogram_rescale_threshold_min = v
-				case "workload_split_on":
-					lg.workload_split_on = v
+				case "stale_treshold_min":
+					lg.stale_treshold_min = v
 
 				default:
 					log.Fatalf("Unknown key %s.%s", name, key)
@@ -325,6 +327,8 @@ func LoadConfig(configFile string) Config {
 					lg.fail_operation_warn = v
 				case "warn_on_out_of_order_time":
 					lg.out_of_order_time_warn = v
+				case "poll_file":
+					lg.poll_file = v
 
 				default:
 					log.Fatalf("Unknown key %s.%s", name, key)
@@ -396,6 +400,9 @@ func LoadConfig(configFile string) Config {
 		}
 		if lg.ewma_interval == 0 {
 			lg.ewma_interval = 30
+		}
+		if lg.stale_treshold_min == 0 {
+			lg.stale_treshold_min = 15
 		}
 
 		//Init channels

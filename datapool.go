@@ -186,13 +186,13 @@ func (lg *LogGroup) dataPoolHandler(channel_number int, tsd_pushers []chan []str
 						switch data_point.metric_type {
 						case "histogram":
 							s := timemetrics.NewExpDecaySample(point_time, lg.histogram_size, lg.histogram_alpha_decay, lg.histogram_rescale_threshold_min)
-							dataPool[data_point.name] = &tsdPoint{data: timemetrics.NewHistogram(s),
+							dataPool[data_point.name] = &tsdPoint{data: timemetrics.NewHistogram(s, lg.stale_treshold_min),
 								lastPush: point_time}
 						case "counter":
-							dataPool[data_point.name] = &tsdPoint{data: timemetrics.NewCounter(point_time),
+							dataPool[data_point.name] = &tsdPoint{data: timemetrics.NewCounter(point_time, lg.stale_treshold_min),
 								lastPush: point_time}
 						case "meter":
-							dataPool[data_point.name] = &tsdPoint{data: timemetrics.NewMeter(point_time, lg.ewma_interval),
+							dataPool[data_point.name] = &tsdPoint{data: timemetrics.NewMeter(point_time, lg.ewma_interval, lg.stale_treshold_min),
 								lastPush: point_time, lastCrunchedPush: point_time}
 						default:
 							log.Fatalf("Unexpected metric type %s!", data_point.metric_type)
