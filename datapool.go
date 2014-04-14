@@ -169,7 +169,6 @@ func (lg *LogGroup) dataPoolHandler(channel_number int, tsd_pushers []chan []str
 
 		var lastTimePushed *time.Time
 		var lastTimeStatsPushed time.Time
-		//		lastNbKeys := 0
 		for {
 			select {
 			case data := <-lg.tail_data[channel_number]:
@@ -212,14 +211,12 @@ func (lg *LogGroup) dataPoolHandler(channel_number int, tsd_pushers []chan []str
 				if point_time.Sub(*lastTimePushed) > (time.Duration(lg.interval) * time.Second) {
 					nbKeys := pushStats(point_time, tsd_push, dataPool)
 
-					t := time.Now()
-					nt := t
-					if nt.Sub(lastTimeStatsPushed) > time.Duration(lg.interval)*time.Second {
-						tsd_push <- lg.getStatsKey(hostname, nbKeys, t, tsd_channel_number)
-						lastTimeStatsPushed = time.Now()
+					t := point_time
+					if t.Sub(lastTimeStatsPushed) > time.Duration(lg.interval)*time.Second {
+						tsd_push <- lg.getStatsKey(hostname, nbKeys, point_time, channel_number)
+						lastTimeStatsPushed = point_time
 					}
 
-					//					lastNbKeys = nbKeys
 					lastTimePushed = &point_time
 				}
 			}
