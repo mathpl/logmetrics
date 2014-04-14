@@ -124,7 +124,7 @@ func StartTsdPushers(config *Config, tsd_pushers []chan []string, doNotSend bool
 					key_push_stats.inc(bytes_written)
 
 					//Stats on key pushed, limit checks with modulo (now() is a syscall)
-					if (key_push_stats.key_pushed%10000) == 0 && key_push_stats.isTimeForStats() {
+					if (key_push_stats.key_pushed%1000) == 0 && key_push_stats.isTimeForStats() {
 						for _, local_line := range key_push_stats.getLine() {
 							bytes_written, conn = writeLine(config, doNotSend, conn, local_line)
 							key_push_stats.inc(bytes_written)
