@@ -36,7 +36,6 @@ Distribution of minimum time spent by resource for calls + total time spent (sum
   - Can use X pusher threads to TSD to get better throughput to it.
 - Low resource usage.
   - This is directly dependent on the configuration used and the number of keys tracked and activity in the logs.
-  - Without actually sending data to TSD it can generate 250k key/s giving ~44Mb/s of data on a i7 laptop using 4 threads.
 - Easy to deploy: a single statically compiled binary.
 - Written in Go.
 
@@ -133,8 +132,14 @@ Here's the configuration for fictional service.  Comments inline. It's in json-l
     #Interval for EWMA calculation when no new data has been parsed for a key
     ewma_interval: 60,
 
+    #Metric will be dropped if no new update has been receive within that time
+    stale_treshold_min: 15,
+
     #Split workload on multiple go routines to scale across cpus
     goroutines: 1,
+
+    #Poll the file instead of using inotify. Defaults to false.
+    poll_file: false
 
     #Push data to TSD every X seconds. Default to 15.
     interval: 15,
@@ -174,6 +179,9 @@ Here's the configuration for fictional service.  Comments inline. It's in json-l
 
     #Seconds to wait before retrying to send data when unable to contact tsd/tcollector
     push_wait: 5
+
+    #Seconds between internal stats are pushed
+    stats_interval: 60,
   }
 ```
 
