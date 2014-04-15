@@ -208,11 +208,11 @@ func (lg *LogGroup) dataPoolHandler(channel_number int, tsd_pushers []chan []str
 				}
 
 				//Support for log playback - Push when <interval> has pass in the logs, not real time
-				if point_time.Sub(*lastTimePushed) > (time.Duration(lg.interval) * time.Second) {
-					nbKeys := pushStats(point_time, tsd_push, dataPool)
+				if point_time.Sub(*lastTimePushed) >= time.Duration(lg.interval)*time.Second {
+					nbKeys := pushKeys(point_time, tsd_push, dataPool)
 
-					t := point_time
-					if t.Sub(lastTimeStatsPushed) > time.Duration(lg.interval)*time.Second {
+					//Push stats as well?
+					if point_time.Sub(lastTimeStatsPushed) > time.Duration(lg.interval)*time.Second {
 						tsd_push <- lg.getStatsKey(hostname, nbKeys, point_time, channel_number)
 						lastTimeStatsPushed = point_time
 					}
@@ -224,17 +224,17 @@ func (lg *LogGroup) dataPoolHandler(channel_number int, tsd_pushers []chan []str
 	}()
 }
 
-func pushStats(lastTimePushed time.Time, tsd_push chan []string, dataPool map[string]*tsdPoint) (nbKeys int) {
+func pushKeys(lastTimePushed time.Time, tsd_push chan []string, dataPool map[string]*tsdPoint) (nbKeys int) {
 	for tsd_key, tsdPoint := range dataPool {
-		if tsdPoint.data.GetMaxTime().Unix() > tsdPoint.lastPush.Unix() {
+		if tsdPoint.data.PushKeysTime(tsdPoint.lastPush) {
 			tsdPoint.lastPush = tsdPoint.data.GetMaxTime()
 			keys := tsdPoint.data.GetKeys(lastTimePushed, tsd_key)
 			tsd_push <- keys
+
+			nbKeys += tsdPoint.data.NbKeys()
 		} else if tsdPoint.data.Stale(lastTimePushed) {
 			delete(dataPool, tsd_key)
 		}
-
-		nbKeys += tsdPoint.data.NbKeys()
 	}
 
 	return
