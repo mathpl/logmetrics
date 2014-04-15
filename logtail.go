@@ -40,7 +40,7 @@ func (ts *tailStats) getTailStatsKey() []string {
 	line := make([]string, 3)
 	line[0] = fmt.Sprintf("logmetrics_collector.tail.line_read %d %d host=%s log_group=%s filename=%s", t.Unix(), ts.line_read, ts.hostname, ts.log_group, ts.filename)
 	line[1] = fmt.Sprintf("logmetrics_collector.tail.byte_read %d %d host=%s log_group=%s filename=%s", t.Unix(), ts.byte_read, ts.hostname, ts.log_group, ts.filename)
-	line[2] = fmt.Sprintf("logmetrics_collector.tail.match %d %d host=%s log_group=%s filename=%s", t.Unix(), ts.line_match, ts.hostname, ts.log_group, ts.filename)
+	line[2] = fmt.Sprintf("logmetrics_collector.tail.line_matched %d %d host=%s log_group=%s filename=%s", t.Unix(), ts.line_match, ts.hostname, ts.log_group, ts.filename)
 
 	return line
 

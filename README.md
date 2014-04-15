@@ -253,7 +253,7 @@ It will also push internal processing stats under the following keys and tags:
 - logmetrics_collector.tail.line_read: Number of line read
   - log_group: log_group name
   - filename: filename tailed
-- logmetrics_collector.tail.match: Number of line matched by regex
+- logmetrics_collector.tail.line_matched: Number of line matched by regex
   - log_group: log_group name
   - filename: filename tailed
 - logmetrics_collector.tail.byte_read: Amount of bytes read from file
