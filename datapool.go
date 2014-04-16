@@ -232,7 +232,9 @@ func pushKeys(lastTimePushed time.Time, tsd_push chan []string, dataPool map[str
 			tsd_push <- keys
 
 			nbKeys += tsdPoint.data.NbKeys()
-		} else if tsdPoint.data.Stale(lastTimePushed) {
+		}
+
+		if tsdPoint.data.Stale(lastTimePushed) {
 			delete(dataPool, tsd_key)
 		}
 	}

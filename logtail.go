@@ -93,7 +93,7 @@ func tailFile(channel_number int, filename string, lg *LogGroup, tsd_pusher chan
 			log.Printf("Regexp match failed on %s, expected %d matches: %s", filename, maxMatches, line.Text)
 		}
 
-		if (tail_stats.line_read%1000) == 0 && tail_stats.isTimeForStats() {
+		if (tail_stats.line_read%100) == 0 && tail_stats.isTimeForStats() {
 			tsd_pusher <- tail_stats.getTailStatsKey()
 		}
 	}
