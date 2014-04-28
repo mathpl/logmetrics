@@ -232,11 +232,13 @@ func pushKeys(lastTimePushed time.Time, tsd_push chan []string, dataPool map[str
 			tsd_push <- keys
 
 			nbKeys += tsdPoint.data.NbKeys()
+
+			if tsdPoint.data.Stale(lastTimePushed) {
+				//Push the key one last time to stabilize rates
+				delete(dataPool, tsd_key)
+			}
 		}
 
-		if tsdPoint.data.Stale(lastTimePushed) {
-			delete(dataPool, tsd_key)
-		}
 	}
 
 	return
