@@ -209,7 +209,7 @@ func (lg *LogGroup) dataPoolHandler(channel_number int, tsd_pushers []chan []str
 
 				//Support for log playback - Push when <interval> has pass in the logs, not real time
 				if point_time.Sub(*lastTimePushed) >= time.Duration(lg.interval)*time.Second {
-					nbKeys := pushKeys(point_time, tsd_push, dataPool, lg.stale_push)
+					nbKeys := pushKeys(point_time, tsd_push, &dataPool, lg.stale_push)
 
 					//Push stats as well?
 					if point_time.Sub(lastTimeStatsPushed) > time.Duration(lg.interval)*time.Second {
@@ -224,14 +224,17 @@ func (lg *LogGroup) dataPoolHandler(channel_number int, tsd_pushers []chan []str
 	}()
 }
 
-func pushKeys(lastTimePushed time.Time, tsd_push chan []string, dataPool map[string]*tsdPoint, stale_push bool) (nbKeys int) {
-	for tsd_key, tsdPoint := range dataPool {
+func pushKeys(lastTimePushed time.Time, tsd_push chan []string, dataPool *map[string]*tsdPoint, stale_push bool) int {
+	nbKeys := 0
+	for tsd_key, tsdPoint := range *dataPool {
 		data := tsdPoint.data
 
-		if tsdPoint.data.Stale(lastTimePushed) {
-			//Push the zeroed-out key one last time to stabilize rates
+		if data.Stale(lastTimePushed) {
+			//Push the zeroed-out key one last time to stabilize aggregated data
 			data.ZeroOut()
-			delete(dataPool, tsd_key)
+			delete(*dataPool, tsd_key)
+		} else {
+			nbKeys += data.NbKeys()
 		}
 
 		if data.PushKeysTime(tsdPoint.lastPush) || stale_push {
@@ -239,11 +242,10 @@ func pushKeys(lastTimePushed time.Time, tsd_push chan []string, dataPool map[str
 			keys := data.GetKeys(lastTimePushed, tsd_key, stale_push)
 			tsd_push <- keys
 
-			nbKeys += tsdPoint.data.NbKeys()
 		}
 	}
 
-	return
+	return nbKeys
 }
 
 func StartDataPools(config *Config, tsd_pushers []chan []string) {
