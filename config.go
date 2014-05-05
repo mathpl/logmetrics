@@ -56,6 +56,7 @@ type LogGroup struct {
 	histogram_rescale_threshold_min int
 	ewma_interval                   int
 	stale_treshold_min              int
+	stale_push                      bool
 
 	goroutines int
 	interval   int
@@ -329,6 +330,8 @@ func LoadConfig(configFile string) Config {
 					lg.out_of_order_time_warn = v
 				case "poll_file":
 					lg.poll_file = v
+				case "stale_push":
+					lg.stale_push = v
 
 				default:
 					log.Fatalf("Unknown key %s.%s", name, key)
