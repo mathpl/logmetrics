@@ -236,7 +236,7 @@ func pushKeys(lastTimePushed time.Time, tsd_push chan []string, dataPool map[str
 
 		if data.PushKeysTime(tsdPoint.lastPush) || stale_push {
 			tsdPoint.lastPush = data.GetMaxTime()
-			keys := data.GetKeys(lastTimePushed, tsd_key)
+			keys := data.GetKeys(lastTimePushed, tsd_key, stale_push)
 			tsd_push <- keys
 
 			nbKeys += tsdPoint.data.NbKeys()
