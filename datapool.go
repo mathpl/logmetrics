@@ -22,8 +22,14 @@ type dataPointTime struct {
 
 type tsdPoint struct {
 	data             timemetrics.Metric
+	filename         string
 	lastPush         time.Time
 	lastCrunchedPush time.Time
+}
+
+type fileInfo struct {
+	lastUpdate time.Time
+	lastPush   time.Time
 }
 
 func (lg *LogGroup) extractTags(data []string) []string {
@@ -141,12 +147,12 @@ func (lg *LogGroup) getKeys(data []string) ([]dataPoint, time.Time) {
 	return dataPoints, t
 }
 
-func (lg *LogGroup) getStatsKey(hostname string, v int, timePush time.Time, tsd_channel_number int) []string {
-	line := make([]string, 1)
-	line[0] = fmt.Sprintf("logmetrics_collector.data_pool.key_tracked %d %d host=%s log_group=%s log_group_number=%d", timePush.Unix(), v, hostname, lg.name, tsd_channel_number)
+func (lg *LogGroup) getStatsKey(hostname string, nbKeys int, totalStale int, timePush time.Time, tsd_channel_number int) []string {
+	line := make([]string, 2)
+	line[0] = fmt.Sprintf("logmetrics_collector.data_pool.key_tracked %d %d host=%s log_group=%s log_group_number=%d", timePush.Unix(), nbKeys, hostname, lg.name, tsd_channel_number)
+	line[1] = fmt.Sprintf("logmetrics_collector.data_pool.key_staled %d %d host=%s log_group=%s log_group_number=%d", timePush.Unix(), totalStale, hostname, lg.name, tsd_channel_number)
 
 	return line
-
 }
 
 func (lg *LogGroup) dataPoolHandler(channel_number int, tsd_pushers []chan []string, tsd_channel_number int) {
@@ -167,12 +173,22 @@ func (lg *LogGroup) dataPoolHandler(channel_number int, tsd_pushers []chan []str
 		//	}
 		//}()
 
+		totalStale := 0
 		var lastTimePushed *time.Time
 		var lastTimeStatsPushed time.Time
+		lastTimeByFile := make(map[string]fileInfo)
 		for {
 			select {
-			case data := <-lg.tail_data[channel_number]:
-				data_points, point_time := lg.getKeys(data)
+			case lineResult := <-lg.tail_data[channel_number]:
+				data_points, point_time := lg.getKeys(lineResult.matches)
+
+				if currentFileInfo, ok := lastTimeByFile[lineResult.filename]; ok {
+					if currentFileInfo.lastUpdate.Before(point_time) {
+						currentFileInfo.lastUpdate = point_time
+					}
+				} else {
+					lastTimeByFile[lineResult.filename] = fileInfo{lastUpdate: point_time}
+				}
 
 				//To start things off
 				if lastTimePushed == nil {
@@ -186,13 +202,13 @@ func (lg *LogGroup) dataPoolHandler(channel_number int, tsd_pushers []chan []str
 						case "histogram":
 							s := timemetrics.NewExpDecaySample(point_time, lg.histogram_size, lg.histogram_alpha_decay, lg.histogram_rescale_threshold_min)
 							dataPool[data_point.name] = &tsdPoint{data: timemetrics.NewHistogram(s, lg.stale_treshold_min),
-								lastPush: point_time}
+								lastPush: point_time, filename: lineResult.filename}
 						case "counter":
 							dataPool[data_point.name] = &tsdPoint{data: timemetrics.NewCounter(point_time, lg.stale_treshold_min),
-								lastPush: point_time}
+								lastPush: point_time, filename: lineResult.filename}
 						case "meter":
 							dataPool[data_point.name] = &tsdPoint{data: timemetrics.NewMeter(point_time, lg.ewma_interval, lg.stale_treshold_min),
-								lastPush: point_time, lastCrunchedPush: point_time}
+								lastPush: point_time, lastCrunchedPush: point_time, filename: lineResult.filename}
 						default:
 							log.Fatalf("Unexpected metric type %s!", data_point.metric_type)
 						}
@@ -201,19 +217,34 @@ func (lg *LogGroup) dataPoolHandler(channel_number int, tsd_pushers []chan []str
 					//Make sure data is ordered or we risk sending duplicate data
 					if dataPool[data_point.name].lastPush.Unix() > point_time.Unix() && lg.out_of_order_time_warn {
 						log.Printf("Non-ordered data detected in log file. Its key already had a update at %s in the future. Offending line: %s",
-							dataPool[data_point.name].lastPush, data[0])
+							dataPool[data_point.name].lastPush, lineResult.matches[0])
 					}
 
 					dataPool[data_point.name].data.Update(point_time, data_point.value)
+					dataPool[data_point.name].filename = lineResult.filename
 				}
 
 				//Support for log playback - Push when <interval> has pass in the logs, not real time
-				if point_time.Sub(*lastTimePushed) >= time.Duration(lg.interval)*time.Second {
-					nbKeys := pushKeys(point_time, tsd_push, &dataPool, lg.stale_push)
+				run_push_keys := false
+				if lg.stale_support && point_time.Sub(*lastTimePushed) >= time.Duration(lg.interval)*time.Second {
+					run_push_keys = true
+				} else if !lg.stale_support {
+					// Check for each file individually
+					for _, fileInfo := range lastTimeByFile {
+						if point_time.Sub(fileInfo.lastPush) >= time.Duration(lg.interval)*time.Second {
+							run_push_keys = true
+							break
+						}
+					}
+				}
+
+				if run_push_keys {
+					nbKeys, nbStale := pushKeys(point_time, tsd_push, &dataPool, &lastTimeByFile, lg.stale_support)
+					totalStale += nbStale
 
 					//Push stats as well?
 					if point_time.Sub(lastTimeStatsPushed) > time.Duration(lg.interval)*time.Second {
-						tsd_push <- lg.getStatsKey(hostname, nbKeys, point_time, channel_number)
+						tsd_push <- lg.getStatsKey(hostname, nbKeys, totalStale, point_time, channel_number)
 						lastTimeStatsPushed = point_time
 					}
 
@@ -224,28 +255,32 @@ func (lg *LogGroup) dataPoolHandler(channel_number int, tsd_pushers []chan []str
 	}()
 }
 
-func pushKeys(lastTimePushed time.Time, tsd_push chan []string, dataPool *map[string]*tsdPoint, stale_push bool) int {
+func pushKeys(point_time time.Time, tsd_push chan []string, dataPool *map[string]*tsdPoint, lastTimeByFile *map[string]fileInfo, stale_support bool) (int, int) {
 	nbKeys := 0
+	nbStale := 0
 	for tsd_key, tsdPoint := range *dataPool {
 		data := tsdPoint.data
+		currentFileInfo := (*lastTimeByFile)[tsdPoint.filename]
 
-		if data.Stale(lastTimePushed) {
+		if stale_support && data.Stale(currentFileInfo.lastUpdate) {
 			//Push the zeroed-out key one last time to stabilize aggregated data
 			data.ZeroOut()
 			delete(*dataPool, tsd_key)
+			delete(*lastTimeByFile, tsdPoint.filename)
+			nbStale += data.NbKeys()
 		} else {
 			nbKeys += data.NbKeys()
 		}
 
-		if data.PushKeysTime(tsdPoint.lastPush) || stale_push {
+		if stale_support || data.PushKeysTime(tsdPoint.lastPush) {
 			tsdPoint.lastPush = data.GetMaxTime()
-			keys := data.GetKeys(lastTimePushed, tsd_key, stale_push)
+			currentFileInfo.lastPush = tsdPoint.lastPush
+			keys := data.GetKeys(point_time, tsd_key, stale_support)
 			tsd_push <- keys
-
 		}
 	}
 
-	return nbKeys
+	return nbKeys, nbStale
 }
 
 func StartDataPools(config *Config, tsd_pushers []chan []string) {

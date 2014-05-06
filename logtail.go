@@ -19,6 +19,11 @@ type tailStats struct {
 	interval    int
 }
 
+type lineResult struct {
+	filename string
+	matches  []string
+}
+
 func (ts *tailStats) isTimeForStats() bool {
 	return time.Now().Sub(ts.last_report) > time.Duration(ts.interval)*time.Second
 }
@@ -81,7 +86,8 @@ func tailFile(channel_number int, filename string, lg *LogGroup, tsd_pusher chan
 			matches := m.Extract()
 			if len(matches) == maxMatches {
 				match_one = true
-				lg.tail_data[channel_number] <- matches
+				results := lineResult{filename, matches}
+				lg.tail_data[channel_number] <- results
 				tail_stats.incLineMatch()
 				break
 			}

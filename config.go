@@ -56,7 +56,7 @@ type LogGroup struct {
 	histogram_rescale_threshold_min int
 	ewma_interval                   int
 	stale_treshold_min              int
-	stale_push                      bool
+	stale_support                   bool
 
 	goroutines int
 	interval   int
@@ -68,7 +68,7 @@ type LogGroup struct {
 	parse_from_start       bool
 
 	//Channels
-	tail_data []chan []string
+	tail_data []chan lineResult
 
 	//Workvars
 	last_date_str string
@@ -330,8 +330,8 @@ func LoadConfig(configFile string) Config {
 					lg.out_of_order_time_warn = v
 				case "poll_file":
 					lg.poll_file = v
-				case "stale_push":
-					lg.stale_push = v
+				case "stale_support":
+					lg.stale_support = v
 
 				default:
 					log.Fatalf("Unknown key %s.%s", name, key)
@@ -409,9 +409,9 @@ func LoadConfig(configFile string) Config {
 		}
 
 		//Init channels
-		lg.tail_data = make([]chan []string, lg.goroutines)
+		lg.tail_data = make([]chan lineResult, lg.goroutines)
 		for i := 0; i < lg.goroutines; i++ {
-			lg.tail_data[i] = make(chan []string, 1000)
+			lg.tail_data[i] = make(chan lineResult, 1000)
 		}
 
 		cfg.logGroups[name.(string)] = &lg

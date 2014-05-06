@@ -54,7 +54,7 @@ func main() {
 		log.SetOutput(logger)
 	}
 
-	//Start he out channels
+	//Start the out channels
 	tsd_pushers := make([]chan []string, config.GetPusherNumber())
 	for i := 0; i < config.GetPusherNumber(); i++ {
 		tsd_pushers[i] = make(chan []string, 1000)
