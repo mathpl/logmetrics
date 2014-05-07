@@ -226,9 +226,9 @@ func (lg *LogGroup) dataPoolHandler(channel_number int, tsd_pushers []chan []str
 
 				//Support for log playback - Push when <interval> has pass in the logs, not real time
 				run_push_keys := false
-				if lg.stale_support && point_time.Sub(*lastTimePushed) >= time.Duration(lg.interval)*time.Second {
+				if lg.disable_stale && point_time.Sub(*lastTimePushed) >= time.Duration(lg.interval)*time.Second {
 					run_push_keys = true
-				} else if !lg.stale_support {
+				} else if !lg.disable_stale {
 					// Check for each file individually
 					for _, fileInfo := range lastTimeByFile {
 						if point_time.Sub(fileInfo.lastPush) >= time.Duration(lg.interval)*time.Second {
@@ -239,7 +239,7 @@ func (lg *LogGroup) dataPoolHandler(channel_number int, tsd_pushers []chan []str
 				}
 
 				if run_push_keys {
-					nbKeys, nbStale := pushKeys(point_time, tsd_push, &dataPool, &lastTimeByFile, lg.stale_support)
+					nbKeys, nbStale := pushKeys(point_time, tsd_push, &dataPool, &lastTimeByFile, lg.disable_stale, lg.push_duplicates)
 					totalStale += nbStale
 
 					//Push stats as well?
@@ -255,14 +255,14 @@ func (lg *LogGroup) dataPoolHandler(channel_number int, tsd_pushers []chan []str
 	}()
 }
 
-func pushKeys(point_time time.Time, tsd_push chan []string, dataPool *map[string]*tsdPoint, lastTimeByFile *map[string]fileInfo, stale_support bool) (int, int) {
+func pushKeys(point_time time.Time, tsd_push chan []string, dataPool *map[string]*tsdPoint, lastTimeByFile *map[string]fileInfo, disable_stale bool, push_duplicates bool) (int, int) {
 	nbKeys := 0
 	nbStale := 0
 	for tsd_key, tsdPoint := range *dataPool {
 		data := tsdPoint.data
 		currentFileInfo := (*lastTimeByFile)[tsdPoint.filename]
 
-		if stale_support && data.Stale(currentFileInfo.lastUpdate) {
+		if !disable_stale && data.Stale(currentFileInfo.lastUpdate) {
 			//Push the zeroed-out key one last time to stabilize aggregated data
 			data.ZeroOut()
 			delete(*dataPool, tsd_key)
@@ -272,10 +272,10 @@ func pushKeys(point_time time.Time, tsd_push chan []string, dataPool *map[string
 			nbKeys += data.NbKeys()
 		}
 
-		if stale_support || data.PushKeysTime(tsdPoint.lastPush) {
+		if !disable_stale || data.PushKeysTime(tsdPoint.lastPush) {
 			tsdPoint.lastPush = data.GetMaxTime()
 			currentFileInfo.lastPush = tsdPoint.lastPush
-			keys := data.GetKeys(point_time, tsd_key, stale_support)
+			keys := data.GetKeys(point_time, tsd_key, push_duplicates)
 			tsd_push <- keys
 		}
 	}
