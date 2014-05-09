@@ -3,7 +3,7 @@
 %define path /usr/local
 %define version 0.4
 %define release 1
-%define app_path src/syseng/logmetrics
+%define app_path src/github.com/mathpl/logmetrics
 %define pcre_version 8.32
  
 Name:           %{name}
