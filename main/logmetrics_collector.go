@@ -8,7 +8,7 @@ import (
 	"os/signal"
 	"runtime"
 	"syscall"
-	"syseng/logmetrics"
+	"github.com/mathpl/logmetrics"
 )
 
 var configFile = flag.String("c", "/etc/logmetrics_collector.conf", "Full path to config file.")
