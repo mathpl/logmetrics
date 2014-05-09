@@ -49,7 +49,7 @@ func writeLine(config *Config, doNotSend bool, conn net.Conn, line string) (int,
 
 	var err error
 	if doNotSend {
-		fmt.Print(line + "\n")
+		fmt.Print(line)
 	} else {
 		for {
 			//Reconnect if needed
