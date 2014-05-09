@@ -5,7 +5,7 @@ import (
 	"log"
 	"strconv"
 	"strings"
-	"syseng/go-timemetrics"
+	"github.comf/mathpl/go-timemetrics"
 	"time"
 )
 
