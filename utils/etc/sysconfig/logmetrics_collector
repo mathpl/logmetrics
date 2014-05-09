@@ -1,0 +1,2 @@
+LOGMETRICS_USER="nobody"
+LOGMETRICS_COLLECTOR_FIELDS="-j 1 -c /etc/logmetrics_collector.conf"
