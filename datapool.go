@@ -252,11 +252,10 @@ func pushKeys(point_time time.Time, tsd_push chan []string, dataPool *map[string
 		data := tsdPoint.data
 		currentFileInfo := (*lastTimeByFile)[tsdPoint.filename]
 
-		if (stale_removal && data.Stale(currentFileInfo.lastUpdate)) || (!stale_removal && data.Stale(point_time)) {
+		if stale_removal && data.Stale(point_time) {
 			//Push the zeroed-out key one last time to stabilize aggregated data
 			data.ZeroOut()
 			delete(*dataPool, tsd_key)
-			delete(*lastTimeByFile, tsdPoint.filename)
 			nbStale += data.NbKeys()
 		} else {
 			nbKeys += data.NbKeys()
