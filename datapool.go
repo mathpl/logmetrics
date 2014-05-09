@@ -5,7 +5,7 @@ import (
 	"log"
 	"strconv"
 	"strings"
-	"github.comf/mathpl/go-timemetrics"
+	"github.com/mathpl/go-timemetrics"
 	"time"
 )
 
