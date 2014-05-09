@@ -10,7 +10,6 @@ import (
 	"log/syslog"
 	"os"
 	"strings"
-	"time"
 )
 
 type Config struct {
@@ -70,10 +69,6 @@ type LogGroup struct {
 
 	//Channels
 	tail_data []chan lineResult
-
-	//Workvars
-	last_date_str string
-	last_date     time.Time
 }
 
 func (lg *LogGroup) getNbTags() int {

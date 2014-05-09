@@ -55,22 +55,12 @@ func (lg *LogGroup) getKeys(data []string) ([]dataPoint, time.Time) {
 	dataPoints := make([]dataPoint, nbKeys)
 
 	//Time
-	var t time.Time
-	if data[lg.date_position] == lg.last_date_str {
-		t = lg.last_date
-	} else {
-		var err error
-		t, err = time.Parse(lg.date_format, data[lg.date_position])
-		if err != nil {
-			log.Print(err)
-			var nt time.Time
-			return nil, nt
-		}
+	t, err := time.Parse(lg.date_format, data[lg.date_position])
+	if err != nil {
+		log.Print(err)
+		var nt time.Time
+		return nil, nt
 	}
-
-	//Keep time around to only parse new dates
-	lg.last_date_str = data[lg.date_position]
-	lg.last_date = t
 
 	//Patch in year if missing - rfc3164
 	if t.Year() == 0 {

@@ -39,7 +39,7 @@ func (f *keyPushStats) isTimeForStats() bool {
 
 func writeLine(config *Config, doNotSend bool, conn net.Conn, line string) (int, net.Conn) {
 	if config.pushType == "tsd" {
-		line = ("put " + line)
+		line = ("put " + line + "\n")
 	} else {
 		line = line
 	}
