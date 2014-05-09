@@ -1,0 +1,113 @@
+#!/bin/bash
+#
+# logmetrics_collector        Startup script for the logmetrics_collector monitoring agent
+#
+# chkconfig:   2345 15 85
+# description: logmetrics_collector is an agent that collects and reports  \
+#              monitoring data from logs for OpenTSDB.
+# processname: logmetrics_collector
+# pidfile: /var/run/logmetrics_collector.pid
+#
+### BEGIN INIT INFO
+# Provides: logmetrics_collector
+# Required-Start: $local_fs $remote_fs $network $named
+# Required-Stop: $local_fs $remote_fs $network
+# Short-Description: start and stop logmetrics_collector log monitoring agent
+# Description: logmetrics_collector is an agent that collects and reports
+#  monitoring data from logs for OpenTSDB.
+### END INIT INFO
+
+# Source function library.
+. /etc/init.d/functions
+
+LOGMETRICS_COLLECTOR=${LOGMETRICS_COLLECTOR-/usr/local/bin/logmetrics_collector}
+PIDFILE=${PIDFILE-/var/run/logmetrics_collector.pid}
+
+prog=logmetrics_collector
+if [ -f /etc/sysconfig/$prog ]; then
+  . /etc/sysconfig/$prog
+fi
+
+if [ -z "$LOGMETRICS_OPTIONS" ]; then
+  LOGMETRICS_OPTIONS="-c /etc/logmetrics_collector.conf"
+fi
+
+sanity_check() {
+  for i in "$PIDFILE"; do
+    # If the file doesn't exist, check that we have write access to its parent
+    # directory to be able to create it.
+    test -e "$i" || i=`dirname "$i"`
+    test -w "$i" || {
+      echo >&2 "error: Cannot write to $i"
+      return 4
+    }
+  done
+
+  if [ -z "$LOGMETRICS_USER" ]; then
+    echo >&2 "error: No \$USER set"
+    return 4
+  fi
+}
+
+start() {
+  echo -n $"Starting $prog: "
+  sanity_check || return $?
+
+  PID=`cat $PIDFILE 2>/dev/null`
+  kill -0 $PID 2>/dev/null
+  if [ $? -eq 0 ]; then
+    echo "Already running";
+    return;
+  fi
+
+  #Perl to the rescue, drop privileges before starting.
+    perl -e "(undef, undef, \$uid, \$gid ) = getpwnam('$LOGMETRICS_USER');
+  $)=\$gid;$>=\$uid;
+  exec '$LOGMETRICS_COLLECTOR $LOGMETRICS_OPTIONS';" &
+
+  PID=$!
+  echo $PID > $PIDFILE
+  sleep 1
+
+  kill -0 $PID 2>/dev/null
+  if [ $? -eq 0 ]; then
+    success
+    RETVAL=0
+  else
+    failure
+    RETVAL=1
+  fi
+  echo
+}
+
+# When stopping logmetrics_collector a delay of ~15 seconds before SIGKILLing the
+# process so as to give enough time for logmetrics_collector to SIGKILL any errant
+# collectors.
+stop() {
+  echo -n $"Stopping $prog: "
+  sanity_check || return $?
+  killproc -p $PIDFILE -d 15 $LOGMETRICS_COLLECTOR
+  RETVAL=$?
+  echo
+}
+
+# See how we were called.
+case "$1" in
+  start) start;;
+  stop) stop;;
+  status)
+    status -p $PIDFILE $LOGMETRICS_COLLECTOR
+    RETVAL=$?
+    ;;
+  restart|force-reload|reload) stop && start;;
+  condrestart|try-restart)
+    if status -p $PIDFILE $LOGMETRICS_COLLECTOR >&/dev/null; then
+      stop && start
+    fi
+    ;;
+  *)
+    echo $"Usage: $prog {start|stop|status|restart|force-reload|reload|condrestart|try-restart}"
+    RETVAL=2
+esac
+
+exit $RETVAL
