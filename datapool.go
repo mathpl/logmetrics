@@ -2,10 +2,10 @@ package logmetrics
 
 import (
 	"fmt"
+	"github.com/mathpl/go-timemetrics"
 	"log"
 	"strconv"
 	"strings"
-	"github.com/mathpl/go-timemetrics"
 	"time"
 )
 
@@ -226,7 +226,7 @@ func (lg *LogGroup) dataPoolHandler(channel_number int, tsd_pushers []chan []str
 
 				//Support for log playback - Push when <interval> has pass in the logs, not real time
 				run_push_keys := false
-				if !lg.stale_removal && point_time.Sub(*lastTimePushed) >= time.Duration(lg.interval)*time.Second {
+				if lg.stale_removal && point_time.Sub(*lastTimePushed) >= time.Duration(lg.interval)*time.Second {
 					run_push_keys = true
 				} else if !lg.stale_removal {
 					// Check for each file individually
