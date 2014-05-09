@@ -55,9 +55,9 @@ type LogGroup struct {
 	histogram_alpha_decay           float64
 	histogram_rescale_threshold_min int
 	ewma_interval                   int
+	stale_removal                   bool
 	stale_treshold_min              int
-	disable_stale                   bool
-	push_duplicates                 bool
+	send_duplicates                 bool
 
 	goroutines int
 	interval   int
@@ -331,10 +331,10 @@ func LoadConfig(configFile string) Config {
 					lg.out_of_order_time_warn = v
 				case "poll_file":
 					lg.poll_file = v
-				case "disable_stale":
-					lg.disable_stale = v
-				case "push_duplicates":
-					lg.push_duplicates = v
+				case "stale_removal":
+					lg.stale_removal = v
+				case "send_duplicates":
+					lg.send_duplicates = v
 
 				default:
 					log.Fatalf("Unknown key %s.%s", name, key)
@@ -399,7 +399,7 @@ func LoadConfig(configFile string) Config {
 			lg.histogram_alpha_decay = 0.15
 		}
 		if lg.histogram_size == 0 {
-			lg.histogram_size = 512
+			lg.histogram_size = 256
 		}
 		if lg.histogram_rescale_threshold_min == 0 {
 			lg.histogram_rescale_threshold_min = 60
@@ -408,7 +408,7 @@ func LoadConfig(configFile string) Config {
 			lg.ewma_interval = 30
 		}
 		if lg.stale_treshold_min == 0 {
-			lg.stale_treshold_min = 15
+			lg.stale_treshold_min = 60
 		}
 
 		//Init channels

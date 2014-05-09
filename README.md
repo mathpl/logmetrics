@@ -28,7 +28,7 @@ Distribution of minimum time spent by resource for calls + total time spent (sum
   - Handle log lag gracefully.
   - Can push old logs to TSD with accuracy. (If TSD can accept it, see limitations)
 - Handles TSD slowness or absence gracefully through buffering and blocking.
-  - If it can't push data to TSD it will wait until it can, progressively blocking its internal functions up to blocking the file tailer. Once TSD becomes available again it will then continue to parse the logs where it was and push was was currently waiting for it.
+  - If it can't push data to TSD it will wait until it can, progressively blocking its internal functions up to blocking the file tailer. Once TSD becomes available again it will then continue to parse the logs where it was and push what it held in memory.
 - Pushes clean data to TSD: no duplicate key and order is always respected.
   - If a key has been updated but hasn't changed in value it will still push it, mostly for precision on old log import. In realtime use tcollector will deal with that use case to limit the number of points sent.
 - Scale CPU and network-wise.
@@ -54,8 +54,8 @@ Here's the configuration for fictional service.  Comments inline. It's in json-l
     # Multiple expressions can be defined but match groups must remain the same
     re: [
       '([A-z]{3}\s+\d+\s+\d+:\d+:\d+)\s+                           # Date 1 \n
-       (\S+)\s+                                                    # server 2, class 3,\n
-       rest_([a-z]+).api:.*                                        # rest type 4 \n
+       (([a-z])+\d+\.\S+)\s+                                       # server 2, class 3,\n
+       rest_([a-z]+)\.api:.*                                       # rest type 4 \n
        \[c:(\S+)\].*                                               # call 5 \n
        \(([0-9]+)\)\s+                                             # call time 6 \n
        \[bnt:([0-9]+)/([0-9]+)\]\s+                                # bnt calls 7, bnt time 8 \n
@@ -125,21 +125,29 @@ Here's the configuration for fictional service.  Comments inline. It's in json-l
     },
 
     # Histogram sampler parameters. See Exponential Decay in http://dimacs.rutgers.edu/~graham/pubs/papers/fwddecay.pdf
-    histogram_size: 1024,
+	# Size of the samplers, has the most effet on memory used when using histograms. Defaults to 256.
+    histogram_size: 256,
     histogram_alpha_decay: 0.15,
-    histogram_rescale_threshold_min: 10,
+    histogram_rescale_threshold_min: 60,
 
-    #Interval for EWMA calculation when no new data has been parsed for a key
-    ewma_interval: 60,
+    # Interval in sec for EWMA calculation when no new data has been parsed for a key. Defaults to 30.
+    ewma_interval: 30,
 
-    #Metric will be dropped if no new update has been receive within that time
+    # Enable removal of metrics that haven't been updated for X amount of time. Defaults to false.
+	stale_removal: true,
+	
+	# Metric will be dropped if no new update has been receive within that time
     stale_treshold_min: 15,
 
-    #Split workload on multiple go routines to scale across cpus
+	# Send metric even if it hasn't changed. Useful for near real-time graphs. Defaults to false.
+	send_duplicates: true,
+
+    # Split workload on multiple go routines to scale across cpus
     goroutines: 1,
 
-    #Poll the file instead of using inotify. Defaults to false.
-    poll_file: false
+    # Poll the file instead of using inotify. Defaults to false.
+	# Last I checked it leaks FD on log rotation, be careful.
+    poll_file: true,
 
     #Push data to TSD every X seconds. Default to 15.
     interval: 15,
@@ -185,10 +193,15 @@ Here's the configuration for fictional service.  Comments inline. It's in json-l
   }
 ```
 
+Example of a line this configuration would parse:
+```
+Feb  8 04:02:26 rest1.mynetwork rest_sales.api: [INFO] [performance] (http-2350-92) [c:session.addItem] [s:d9ea09bf2612060d9] [r:141915]  (34) [bnt:1/28] [sql:2/1] [membase:0/0] [memcache:4/2] [other:0/0]
+```
+
 With this configuration and the level of information we have in the performance logs in this fictive applications we can extract the following information:
 - Meter information: Simple counter going up by the value parsed on each line.
   - Call count
-  - Resource call count: bnt, sql, membase, memcache, other (tct, etc)
+  - Resource call count: bnt, sql, membase, memcache, other
 - Histogram information: Distribution of the value parsed.
   - Call time
   - Resource call time: bnt, sql, membase, memcache, other
@@ -262,6 +275,9 @@ It will also push internal processing stats under the following keys and tags:
 - logmetrics_collector.data_pool.key_tracked: Number of keys tracked by a data pool.
   - log_group: log_group name
   - log_group_number: log_group number when multiple goroutines are used
+- logmetrics_collector.data_pool.key_stalled: Number of keys that have been recognized as stale and have been removed.
+  - log_group: log_group name
+  - log_group_number: log_group number when multiple goroutines are used
 - logmetrics_collector.pusher.key_sent
   - pusher_number: pusher number when multiple ones are used.
 - logmetrics_collector.pusher.byte_sent
@@ -292,10 +308,9 @@ List of tasks pending related to logmetrics-collector.
   - The time histogram of "resource=self" should be the time spent on the server minus the time of every other resources. Currently it's the total call time make the graph omitting the resource tag incorrect. -Done
 - Recover gracefully from panics (if any)
 - Persist file tailer position and datapool to disk to enable downtime without side effect.
-- Push internal metrics to TSD: Mem usage, GC info, key/data sent, data pool size, line parsed, etc.
-- Commit code somewhere. Github or stick to TM-only?
+- Push internal metrics to TSD: Mem usage, GC info, key/data sent, data pool size, line parsed, etc. -Half-done
 - Clean up go-metrics remains.
-- Nice to have: Come up with a cleaner way code-wise to parse config, make interface{} for metrics.
+- Clean up data structures.
 
 
 Many thanks to Kieren Hynd for the idea and input!

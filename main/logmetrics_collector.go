@@ -14,7 +14,7 @@ import (
 var configFile = flag.String("c", "/etc/logmetrics_collector.conf", "Full path to config file.")
 var threads = flag.Int("j", 1, "Thread count.")
 var logToConsole = flag.Bool("d", false, "Print to console.")
-var doNotSend = flag.Bool("D", false, "Do not send data out to TSD.")
+var doNotSend = flag.Bool("D", false, "Print data instead of sending over network.")
 
 func main() {
 	//Process execution flags
