@@ -2,13 +2,13 @@ package main
 
 import (
 	"flag"
+	"github.com/mathpl/logmetrics"
 	"log"
 	"log/syslog"
 	"os"
 	"os/signal"
 	"runtime"
 	"syscall"
-	"github.com/mathpl/logmetrics"
 )
 
 var configFile = flag.String("c", "/etc/logmetrics_collector.conf", "Full path to config file.")
@@ -44,7 +44,7 @@ func main() {
 	config := logmetrics.LoadConfig(*configFile)
 
 	//Logger
-	logger, err := syslog.New(syslog.LOG_LOCAL3, "logmetrics_collector")
+	logger, err := syslog.New(config.GetSyslogFacility(), "logmetrics_collector")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -52,6 +52,8 @@ func main() {
 
 	if !*logToConsole {
 		log.SetOutput(logger)
+	} else {
+		log.SetFlags(0)
 	}
 
 	//Start the out channels

@@ -87,8 +87,13 @@ func (lg *LogGroup) getNbKeys() int {
 func (conf *Config) GetPusherNumber() int {
 	return conf.pushNumber
 }
+
 func (conf *Config) GetTsdTarget() string {
 	return fmt.Sprintf("%s:%d", conf.pushHost, conf.pushPort)
+}
+
+func (conf *Config) GetSyslogFacility() syslog.Priority {
+	return conf.logFacility
 }
 
 func getHostname() string {
@@ -218,7 +223,7 @@ func LoadConfig(configFile string) Config {
 			case "log_facility":
 				//Lookup
 				if facility, found := facilityStrings[v]; found == true {
-					cfg.logFacility = facility
+					cfg.logFacility = syslog.LOG_INFO | facility
 				} else {
 					log.Fatalf("Unable to map log_facility: %s", v)
 				}
