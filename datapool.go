@@ -253,8 +253,11 @@ func (lg *LogGroup) pushKeys(point_time time.Time, tsd_push chan []string, dataP
 		currentFileInfo := (*lastTimeByFile)[tsdPoint.filename]
 
 		if lg.stale_removal && data.Stale(point_time) {
+			if lg.log_stale_metrics {
+				log.Printf("Deleting stale metric: %s", tsd_key)
+			}
+
 			//Push the zeroed-out key one last time to stabilize aggregated data
-			log.Printf("Deleting stale metric: %s", tsd_key)
 			data.ZeroOut()
 			delete(*dataPool, tsd_key)
 			nbStale += data.NbKeys()
