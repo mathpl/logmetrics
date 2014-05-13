@@ -65,6 +65,7 @@ type LogGroup struct {
 	fail_operation_warn    bool
 	fail_regex_warn        bool
 	out_of_order_time_warn bool
+	stale_log              bool
 	parse_from_start       bool
 
 	//Channels
@@ -330,6 +331,8 @@ func LoadConfig(configFile string) Config {
 					lg.stale_removal = v
 				case "send_duplicates":
 					lg.send_duplicates = v
+				case "stale_log":
+					lg.stale_log = v
 
 				default:
 					log.Fatalf("Unknown key %s.%s", name, key)

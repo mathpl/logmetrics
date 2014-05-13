@@ -229,7 +229,7 @@ func (lg *LogGroup) dataPoolHandler(channel_number int, tsd_pushers []chan []str
 				}
 
 				if run_push_keys {
-					nbKeys, nbStale := pushKeys(point_time, tsd_push, &dataPool, &lastTimeByFile, lg.stale_removal, lg.send_duplicates)
+					nbKeys, nbStale := lg.pushKeys(point_time, tsd_push, &dataPool, &lastTimeByFile)
 					totalStale += nbStale
 
 					//Push stats as well?
@@ -245,15 +245,16 @@ func (lg *LogGroup) dataPoolHandler(channel_number int, tsd_pushers []chan []str
 	}()
 }
 
-func pushKeys(point_time time.Time, tsd_push chan []string, dataPool *map[string]*tsdPoint, lastTimeByFile *map[string]fileInfo, stale_removal bool, send_duplicates bool) (int, int) {
+func (lg *LogGroup) pushKeys(point_time time.Time, tsd_push chan []string, dataPool *map[string]*tsdPoint, lastTimeByFile *map[string]fileInfo) (int, int) {
 	nbKeys := 0
 	nbStale := 0
 	for tsd_key, tsdPoint := range *dataPool {
 		data := tsdPoint.data
 		currentFileInfo := (*lastTimeByFile)[tsdPoint.filename]
 
-		if stale_removal && data.Stale(point_time) {
+		if lg.stale_removal && data.Stale(point_time) {
 			//Push the zeroed-out key one last time to stabilize aggregated data
+			log.Printf("Deleting stale metric: %s", tsd_key)
 			data.ZeroOut()
 			delete(*dataPool, tsd_key)
 			nbStale += data.NbKeys()
@@ -261,12 +262,12 @@ func pushKeys(point_time time.Time, tsd_push chan []string, dataPool *map[string
 			nbKeys += data.NbKeys()
 		}
 
-		if send_duplicates || data.PushKeysTime(tsdPoint.lastPush) {
+		if lg.send_duplicates || data.PushKeysTime(tsdPoint.lastPush) {
 			tsdPoint.lastPush = data.GetMaxTime()
 			currentFileInfo.lastPush = tsdPoint.lastPush
 
 			// When sending duplicate use the current time instead of the lawst updated time of the metric.
-			keys := data.GetKeys(point_time, tsd_key, send_duplicates)
+			keys := data.GetKeys(point_time, tsd_key, lg.send_duplicates)
 
 			tsd_push <- keys
 		}
