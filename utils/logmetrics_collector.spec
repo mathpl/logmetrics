@@ -2,7 +2,7 @@
 %define tester_name logmetrics_parsertest
 %define path /usr/local
 %define version 0.4
-%define release 1
+%define release 9
 %define app_path src/github.com/mathpl/logmetrics
 %define pcre_version 8.32
  
@@ -78,6 +78,30 @@ CGO_LDFLAGS="-lpcre -L`pwd`" CGO_CFLAGS="-I$RPM_BUILD_DIR/pcre-%{pcre_version}/"
 /etc/init.d/%{name}
 
 %changelog
+* Mon Jul 28 2014 Mathieu Payeur <mathpl@github.com> - 0.4-9
+- Better initscript.
+
+* Tue May 09 2014 Mathieu Payeur <mathpl@github.com> - 0.4-8
+- Logging timestamps with stale logging.
+
+* Tue May 09 2014 Mathieu Payeur <mathpl@github.com> - 0.4-7
+- Better name to support to print staled metrics.
+
+* Tue May 09 2014 Mathieu Payeur <mathpl@github.com> - 0.4-6
+- Support to print staled metrics.
+
+* Tue May 09 2014 Mathieu Payeur <mathpl@github.com> - 0.4-5
+- Logic error with stale removal. Yet again!
+
+* Tue May 09 2014 Mathieu Payeur <mathpl@github.com> - 0.4-4
+- Logic error with stale removal. Again!
+
+* Tue May 08 2014 Mathieu Payeur <mathpl@github.com> - 0.4-3
+- Logic error with stale removal.
+
+* Tue May 08 2014 Mathieu Payeur <mathpl@github.com> - 0.4-2
+- Better config options for stale metrics. Sending duplicate metrics now an option.
+
 * Tue May 07 2014 Mathieu Payeur <mathpl@github.com> - 0.4-1
 - Stale value support for realtime metrics.
 

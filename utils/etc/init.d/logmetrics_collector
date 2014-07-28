@@ -61,9 +61,9 @@ start() {
   fi
 
   #Perl to the rescue, drop privileges before starting.
-    perl -e "(undef, undef, \$uid, \$gid ) = getpwnam('$LOGMETRICS_USER');
-  $)=\$gid;$>=\$uid;
-  exec '$LOGMETRICS_COLLECTOR $LOGMETRICS_OPTIONS';" &
+  nohup perl -e "(undef, undef, \$uid, \$gid ) = getpwnam('$LOGMETRICS_USER');
+    $)=\$gid;$>=\$uid;
+    exec '$LOGMETRICS_COLLECTOR $LOGMETRICS_OPTIONS';" 2>&1 >/dev/null &
 
   PID=$!
   echo $PID > $PIDFILE
