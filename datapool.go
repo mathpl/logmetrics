@@ -34,35 +34,15 @@ type fileInfo struct {
 }
 
 type DataPool struct {
-	name      string
-	hostname  string
-	data      map[string]*tsdPoint
-	tsd_push  chan []string
-	tail_data chan lineResult
+	data          map[string]*tsdPoint
+	duplicateSent map[string]bool
+	tsd_push      chan []string
+	tail_data     chan lineResult
 
 	channel_number     int
 	tsd_channel_number int
 
-	stale_removal          bool
-	out_of_order_time_warn bool
-	log_stale_metrics      bool
-	fail_operation_warn    bool
-	send_duplicates        bool
-
-	date_position int
-	date_format   string
-
-	interval         int
-	expected_matches int
-	key_prefix       string
-	tags             map[string]int
-	metrics          map[int][]KeyExtract
-
-	histogram_size                  int
-	histogram_alpha_decay           float64
-	histogram_rescale_threshold_min int
-	ewma_interval                   int
-	stale_treshold_min              int
+	lg *LogGroup
 
 	total_keys     int
 	total_stale    int
@@ -71,25 +51,13 @@ type DataPool struct {
 	Bye chan bool
 }
 
-func (dp *DataPool) getNbTags() int {
-	return len(dp.tags)
-}
-
-func (dp *DataPool) getNbKeys() int {
-	i := 0
-	for _, metrics := range dp.metrics {
-		i += len(metrics)
-	}
-	return i
-}
-
 func (dp *DataPool) extractTags(data []string) []string {
-	tags := make([]string, len(dp.tags))
+	tags := make([]string, dp.lg.getNbTags())
 
 	i := 0
 
 	//General tags
-	for tagname, position := range dp.tags {
+	for tagname, position := range dp.lg.tags {
 		tags[i] = fmt.Sprintf("%s=%s", tagname, data[position])
 		i++
 	}
@@ -102,11 +70,11 @@ func (dp *DataPool) getKeys(data []string) ([]dataPoint, time.Time) {
 
 	tags := dp.extractTags(data)
 
-	nbKeys := dp.getNbKeys()
+	nbKeys := dp.lg.getNbKeys()
 	dataPoints := make([]dataPoint, nbKeys)
 
 	//Time
-	t, err := time.Parse(dp.date_format, data[dp.date_position])
+	t, err := time.Parse(dp.lg.date_format, data[dp.lg.date_position])
 	if err != nil {
 		log.Print(err)
 		var nt time.Time
@@ -120,8 +88,8 @@ func (dp *DataPool) getKeys(data []string) ([]dataPoint, time.Time) {
 	}
 
 	//Make a first pass extracting the data, applying float->int conversion on multiplier
-	values := make([]int64, dp.expected_matches+1)
-	for position, keyTypes := range dp.metrics {
+	values := make([]int64, dp.lg.expected_matches+1)
+	for position, keyTypes := range dp.lg.metrics {
 		for _, keyType := range keyTypes {
 			if position == 0 {
 				values[position] = 1
@@ -154,9 +122,9 @@ func (dp *DataPool) getKeys(data []string) ([]dataPoint, time.Time) {
 	var i = 0
 	for position, val := range values {
 		//Is the value a metric?
-		for _, keyType := range dp.metrics[position] {
+		for _, keyType := range dp.lg.metrics[position] {
 			//Key name
-			key := fmt.Sprintf("%s.%s.%s %s %s", dp.key_prefix, keyType.key_suffix, "%s %d %s", strings.Join(tags, " "), keyType.tag)
+			key := fmt.Sprintf("%s.%s.%s %s %s", dp.lg.key_prefix, keyType.key_suffix, "%s %d %s", strings.Join(tags, " "), keyType.tag)
 
 			//Do we need to do any operation on this val?
 			for op, opvalues := range keyType.operations {
@@ -174,7 +142,7 @@ func (dp *DataPool) getKeys(data []string) ([]dataPoint, time.Time) {
 				}
 			}
 
-			if val < 0 && dp.fail_operation_warn {
+			if val < 0 && dp.lg.fail_operation_warn {
 				log.Printf("Values cannot be negative after applying operation. Offending line: %s", data[0])
 				var nt time.Time
 				return nil, nt
@@ -190,14 +158,14 @@ func (dp *DataPool) getKeys(data []string) ([]dataPoint, time.Time) {
 
 func (dp *DataPool) getStatsKey(timePush time.Time) []string {
 	line := make([]string, 2)
-	line[0] = fmt.Sprintf("logmetrics_collector.data_pool.key_tracked %d %d host=%s log_group=%s log_group_number=%d", timePush.Unix(), dp.total_keys, dp.hostname, dp.name, dp.tsd_channel_number)
-	line[1] = fmt.Sprintf("logmetrics_collector.data_pool.key_staled %d %d host=%s log_group=%s log_group_number=%d", timePush.Unix(), dp.total_stale, dp.hostname, dp.name, dp.tsd_channel_number)
+	line[0] = fmt.Sprintf("logmetrics_collector.data_pool.key_tracked %d %d host=%s log_group=%s log_group_number=%d", timePush.Unix(), dp.total_keys, dp.lg.hostname, dp.lg.name, dp.tsd_channel_number)
+	line[1] = fmt.Sprintf("logmetrics_collector.data_pool.key_staled %d %d host=%s log_group=%s log_group_number=%d", timePush.Unix(), dp.total_stale, dp.lg.hostname, dp.lg.name, dp.tsd_channel_number)
 
 	return line
 }
 
 func (dp *DataPool) start() {
-	log.Printf("Datapool[%s:%d] started. Pushing keys to TsdPusher[%d]", dp.name, dp.channel_number, dp.tsd_channel_number)
+	log.Printf("Datapool[%s:%d] started. Pushing keys to TsdPusher[%d]", dp.lg.name, dp.channel_number, dp.tsd_channel_number)
 
 	//Start the handler
 	go func() {
@@ -205,6 +173,9 @@ func (dp *DataPool) start() {
 		var lastTimeStatsPushed time.Time
 		for {
 			select {
+			case <-dp.Bye:
+				log.Printf("Datapool[%s:%d] stopping.", dp.lg.name, dp.channel_number)
+				return
 			case line_result := <-dp.tail_data:
 				data_points, point_time := dp.getKeys(line_result.matches)
 
@@ -226,14 +197,14 @@ func (dp *DataPool) start() {
 					if _, ok := dp.data[data_point.name]; !ok {
 						switch data_point.metric_type {
 						case "histogram":
-							s := timemetrics.NewExpDecaySample(point_time, dp.histogram_size, dp.histogram_alpha_decay, dp.histogram_rescale_threshold_min)
-							dp.data[data_point.name] = &tsdPoint{data: timemetrics.NewHistogram(s, dp.stale_treshold_min),
+							s := timemetrics.NewExpDecaySample(point_time, dp.lg.histogram_size, dp.lg.histogram_alpha_decay, dp.lg.histogram_rescale_threshold_min)
+							dp.data[data_point.name] = &tsdPoint{data: timemetrics.NewHistogram(s, dp.lg.stale_treshold_min),
 								last_push: point_time, filename: line_result.filename}
 						case "counter":
-							dp.data[data_point.name] = &tsdPoint{data: timemetrics.NewCounter(point_time, dp.stale_treshold_min),
+							dp.data[data_point.name] = &tsdPoint{data: timemetrics.NewCounter(point_time, dp.lg.stale_treshold_min),
 								last_push: point_time, filename: line_result.filename}
 						case "meter":
-							dp.data[data_point.name] = &tsdPoint{data: timemetrics.NewMeter(point_time, dp.ewma_interval, dp.stale_treshold_min),
+							dp.data[data_point.name] = &tsdPoint{data: timemetrics.NewMeter(point_time, dp.lg.ewma_interval, dp.lg.stale_treshold_min),
 								last_push: point_time, last_crunched_push: point_time, filename: line_result.filename}
 						default:
 							log.Fatalf("Unexpected metric type %s!", data_point.metric_type)
@@ -241,7 +212,7 @@ func (dp *DataPool) start() {
 					}
 
 					//Make sure data is ordered or we risk sending duplicate data
-					if dp.data[data_point.name].last_push.Unix() > point_time.Unix() && dp.out_of_order_time_warn {
+					if dp.data[data_point.name].last_push.Unix() > point_time.Unix() && dp.lg.out_of_order_time_warn {
 						log.Printf("Non-ordered data detected in log file. Its key already had a update at %s in the future. Offending line: %s",
 							dp.data[data_point.name].last_push, line_result.matches[0])
 					}
@@ -252,12 +223,12 @@ func (dp *DataPool) start() {
 
 				//Support for log playback - Push when <interval> has pass in the logs, not real time
 				run_push_keys := false
-				if dp.stale_removal && point_time.Sub(*last_time_pushed) >= time.Duration(dp.interval)*time.Second {
+				if dp.lg.stale_removal && point_time.Sub(*last_time_pushed) >= time.Duration(dp.lg.interval)*time.Second {
 					run_push_keys = true
-				} else if !dp.stale_removal {
+				} else if !dp.lg.stale_removal {
 					// Check for each file individually
 					for _, fileInfo := range dp.last_time_file {
-						if point_time.Sub(fileInfo.last_push) >= time.Duration(dp.interval)*time.Second {
+						if point_time.Sub(fileInfo.last_push) >= time.Duration(dp.lg.interval)*time.Second {
 							run_push_keys = true
 							break
 						}
@@ -270,7 +241,7 @@ func (dp *DataPool) start() {
 					dp.total_stale += nb_stale
 
 					//Push stats as well?
-					if point_time.Sub(lastTimeStatsPushed) > time.Duration(dp.interval)*time.Second {
+					if point_time.Sub(lastTimeStatsPushed) > time.Duration(dp.lg.interval)*time.Second {
 						dp.tsd_push <- dp.getStatsKey(point_time)
 						lastTimeStatsPushed = point_time
 					}
@@ -289,8 +260,8 @@ func (dp *DataPool) pushKeys(point_time time.Time) (int, int) {
 		pointData := tsdPoint.data
 		currentFileInfo := dp.last_time_file[tsdPoint.filename]
 
-		if dp.stale_removal && pointData.Stale(point_time) {
-			if dp.log_stale_metrics {
+		if dp.lg.stale_removal && pointData.Stale(point_time) {
+			if dp.lg.log_stale_metrics {
 				log.Printf("Deleting stale metric. Last update: %s Current time: %s Metric: %s", pointData.GetMaxTime(), point_time, tsd_key)
 			}
 
@@ -302,12 +273,26 @@ func (dp *DataPool) pushKeys(point_time time.Time) (int, int) {
 			nbKeys += pointData.NbKeys()
 		}
 
-		if dp.send_duplicates || pointData.PushKeysTime(tsdPoint.last_push) {
+		updateToSend := pointData.PushKeysTime(tsdPoint.last_push)
+		sendingDuplicate := dp.lg.send_duplicates && !dp.duplicateSent[tsd_key]
+		if sendingDuplicate || updateToSend {
 			tsdPoint.last_push = pointData.GetMaxTime()
 			currentFileInfo.last_push = tsdPoint.last_push
 
 			// When sending duplicate use the current time instead of the lawst updated time of the metric.
-			keys := pointData.GetKeys(point_time, tsd_key, dp.send_duplicates)
+			keys := pointData.GetKeys(point_time, tsd_key, dp.lg.send_duplicates)
+
+			if updateToSend {
+				// This key has had a duplicate sent already
+				// There is a new update, send a duplicate from -<interval> to get a good graph
+				if dp.duplicateSent[tsd_key] {
+					previous_time := point_time.Add(-time.Second * time.Duration(dp.lg.interval))
+					dupKeys := pointData.GetKeys(previous_time, tsd_key, dp.lg.send_duplicates)
+					keys = append(dupKeys, keys[:]...)
+				}
+
+				dp.duplicateSent[tsd_key] = false
+			}
 
 			dp.tsd_push <- keys
 		}
