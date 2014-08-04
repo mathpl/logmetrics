@@ -3,13 +3,14 @@ package logmetrics
 import (
 	"errors"
 	"fmt"
-	"github.com/mathpl/golang-pkg-pcre/src/pkg/pcre"
 	"io/ioutil"
-	"launchpad.net/~niemeyer/goyaml/beta"
 	"log"
 	"log/syslog"
 	"os"
 	"strings"
+
+	"github.com/mathpl/golang-pkg-pcre/src/pkg/pcre"
+	"launchpad.net/~niemeyer/goyaml/beta"
 )
 
 type Config struct {
@@ -42,6 +43,7 @@ type LogGroup struct {
 	re               []*pcre.Regexp
 	strRegexp        []string
 	expected_matches int
+	hostname         string
 
 	date_position int
 	date_format   string
@@ -72,18 +74,6 @@ type LogGroup struct {
 	tail_data []chan lineResult
 }
 
-func (lg *LogGroup) getNbTags() int {
-	return len(lg.tags)
-}
-
-func (lg *LogGroup) getNbKeys() int {
-	i := 0
-	for _, metrics := range lg.metrics {
-		i += len(metrics)
-	}
-	return i
-}
-
 func (conf *Config) GetPusherNumber() int {
 	return conf.pushNumber
 }
@@ -94,6 +84,42 @@ func (conf *Config) GetTsdTarget() string {
 
 func (conf *Config) GetSyslogFacility() syslog.Priority {
 	return conf.logFacility
+}
+
+func (lg *LogGroup) CreateDataPool(channel_number int, tsd_pushers []chan []string, tsd_channel_number int) (dp *DataPool) {
+	dp.Bye = make(chan bool)
+
+	dp.channel_number = channel_number
+	dp.tail_data = lg.tail_data[channel_number]
+
+	dp.data = make(map[string]*tsdPoint)
+	dp.tsd_push = tsd_pushers[tsd_channel_number]
+
+	dp.name = lg.name
+	dp.hostname = lg.hostname
+	dp.last_time_file = make(map[string]fileInfo)
+	dp.tsd_channel_number = tsd_channel_number
+
+	dp.stale_removal = lg.stale_removal
+	dp.out_of_order_time_warn = lg.out_of_order_time_warn
+	dp.log_stale_metrics = lg.log_stale_metrics
+	dp.interval = lg.interval
+	dp.tags = lg.tags
+	dp.metrics = lg.metrics
+	dp.date_position = lg.date_position
+	dp.date_format = lg.date_format
+	dp.expected_matches = lg.expected_matches
+	dp.key_prefix = lg.key_prefix
+	dp.fail_operation_warn = lg.fail_operation_warn
+
+	dp.histogram_size = lg.histogram_size
+	dp.histogram_alpha_decay = lg.histogram_alpha_decay
+	dp.histogram_rescale_threshold_min = lg.histogram_rescale_threshold_min
+	dp.ewma_interval = lg.ewma_interval
+	dp.stale_treshold_min = lg.stale_treshold_min
+	dp.send_duplicates = lg.send_duplicates
+
+	return dp
 }
 
 func getHostname() string {
@@ -354,7 +380,6 @@ func LoadConfig(configFile string) Config {
 							log.Fatal(err)
 						}
 					}
-
 				case "files":
 					for _, file := range v {
 						lg.globFiles = append(lg.globFiles, file.(string))
@@ -419,6 +444,7 @@ func LoadConfig(configFile string) Config {
 		for i := 0; i < lg.goroutines; i++ {
 			lg.tail_data[i] = make(chan lineResult, 1000)
 		}
+		lg.hostname = getHostname()
 
 		cfg.logGroups[name.(string)] = &lg
 	}

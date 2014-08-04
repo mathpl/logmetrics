@@ -2,13 +2,14 @@ package main
 
 import (
 	"flag"
-	"github.com/mathpl/logmetrics"
 	"log"
 	"log/syslog"
 	"os"
 	"os/signal"
 	"runtime"
 	"syscall"
+
+	"github.com/mathpl/logmetrics"
 )
 
 var configFile = flag.String("c", "/etc/logmetrics_collector.conf", "Full path to config file.")
@@ -66,11 +67,16 @@ func main() {
 	logmetrics.StartTails(&config, tsd_pushers)
 
 	//Start datapools
-	logmetrics.StartDataPools(&config, tsd_pushers)
+	dps := logmetrics.StartDataPools(&config, tsd_pushers)
 
 	//Start TSD pusher
 	logmetrics.StartTsdPushers(&config, tsd_pushers, *doNotSend)
 
 	//Block until we're told to stop
 	<-stop
+
+	//Stop data pools
+	for _, dp := range dps {
+		dp.Bye <- true
+	}
 }
