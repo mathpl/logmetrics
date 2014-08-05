@@ -3,6 +3,7 @@ package logmetrics
 import (
 	"fmt"
 	"log"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -35,12 +36,14 @@ type fileInfo struct {
 
 type DataPool struct {
 	data          map[string]*tsdPoint
-	duplicateSent map[string]bool
+	duplicateSent map[string]*time.Time
 	tsd_push      chan []string
 	tail_data     chan lineResult
 
 	channel_number     int
 	tsd_channel_number int
+
+	tag_order []string
 
 	lg *LogGroup
 
@@ -51,15 +54,25 @@ type DataPool struct {
 	Bye chan bool
 }
 
-func (dp *DataPool) extractTags(data []string) []string {
-	tags := make([]string, dp.lg.getNbTags())
-
+func (dp *DataPool) compileTagOrder() {
+	tag_order := make([]string, dp.lg.getNbTags())
 	i := 0
-
-	//General tags
-	for tagname, position := range dp.lg.tags {
-		tags[i] = fmt.Sprintf("%s=%s", tagname, data[position])
+	for tagname, _ := range dp.lg.tags {
+		tag_order[i] = tagname
 		i++
+	}
+	sort.Strings(tag_order)
+
+	dp.tag_order = tag_order
+}
+
+func (dp *DataPool) extractTags(data []string) []string {
+	//General tags
+	tags := make([]string, dp.lg.getNbTags())
+	for cnt, tagname := range dp.tag_order {
+		//for tagname, position := range dp.lg.tags {
+		position := dp.lg.tags[tagname]
+		tags[cnt] = fmt.Sprintf("%s=%s", tagname, data[position])
 	}
 
 	return tags
@@ -199,20 +212,20 @@ func (dp *DataPool) start() {
 						case "histogram":
 							s := timemetrics.NewExpDecaySample(point_time, dp.lg.histogram_size, dp.lg.histogram_alpha_decay, dp.lg.histogram_rescale_threshold_min)
 							dp.data[data_point.name] = &tsdPoint{data: timemetrics.NewHistogram(s, dp.lg.stale_treshold_min),
-								last_push: point_time, filename: line_result.filename}
+								filename: line_result.filename}
 						case "counter":
 							dp.data[data_point.name] = &tsdPoint{data: timemetrics.NewCounter(point_time, dp.lg.stale_treshold_min),
-								last_push: point_time, filename: line_result.filename}
+								filename: line_result.filename}
 						case "meter":
 							dp.data[data_point.name] = &tsdPoint{data: timemetrics.NewMeter(point_time, dp.lg.ewma_interval, dp.lg.stale_treshold_min),
-								last_push: point_time, last_crunched_push: point_time, filename: line_result.filename}
+								filename: line_result.filename}
 						default:
 							log.Fatalf("Unexpected metric type %s!", data_point.metric_type)
 						}
 					}
 
 					//Make sure data is ordered or we risk sending duplicate data
-					if dp.data[data_point.name].last_push.Unix() > point_time.Unix() && dp.lg.out_of_order_time_warn {
+					if dp.data[data_point.name].last_push.After(point_time) && dp.lg.out_of_order_time_warn {
 						log.Printf("Non-ordered data detected in log file. Its key already had a update at %s in the future. Offending line: %s",
 							dp.data[data_point.name].last_push, line_result.matches[0])
 					}
@@ -274,27 +287,39 @@ func (dp *DataPool) pushKeys(point_time time.Time) (int, int) {
 		}
 
 		updateToSend := pointData.PushKeysTime(tsdPoint.last_push)
-		sendingDuplicate := dp.lg.send_duplicates && !dp.duplicateSent[tsd_key]
-		if sendingDuplicate || updateToSend {
+
+		var keys []string
+		if updateToSend {
 			tsdPoint.last_push = pointData.GetMaxTime()
 			currentFileInfo.last_push = tsdPoint.last_push
 
-			// When sending duplicate use the current time instead of the lawst updated time of the metric.
-			keys := pointData.GetKeys(point_time, tsd_key, dp.lg.send_duplicates)
+			// When sending duplicate use the current time instead of the last updated time of the metric.
+			keys = pointData.GetKeys(point_time, tsd_key, dp.lg.send_duplicates)
+		}
 
-			if updateToSend {
-				// This key has had a duplicate sent already
-				// There is a new update, send a duplicate from -<interval> to get a good graph
-				if dp.duplicateSent[tsd_key] {
-					previous_time := point_time.Add(-time.Second * time.Duration(dp.lg.interval))
-					dupKeys := pointData.GetKeys(previous_time, tsd_key, dp.lg.send_duplicates)
-					keys = append(dupKeys, keys[:]...)
-				}
-
-				dp.duplicateSent[tsd_key] = false
+		if dp.lg.send_duplicates {
+			if !updateToSend {
+				//previous_time := point_time.Add(-(time.Second * time.Duration(dp.lg.interval)))
+				//	if dp.duplicateSent[tsd_key] != nil && previous_time.After(*dp.duplicateSent[tsd_key]) {
+				//		// This key has had a duplicate sent already
+				//		// There is a new update, send a duplicate from -<interval> to get a good graph
+				//		dupKeys := pointData.GetKeys(previous_time, tsd_key, dp.lg.send_duplicates)
+				//		keys = append(dupKeys, keys[:]...)
+				//		dp.duplicateSent[tsd_key] = nil
+				//		log.Printf("%+V", keys)
+				//	}
+				//} else if dp.duplicateSent[tsd_key] == nil {
+				//} else {
+				// No duplicate has been sent already
+				keys = pointData.GetKeys(point_time, tsd_key, dp.lg.send_duplicates)
+				dp.duplicateSent[tsd_key] = &point_time
 			}
+		}
 
-			dp.tsd_push <- keys
+		dp.tsd_push <- keys
+
+		if currentFileInfo.last_push.After(dp.last_time_file[tsdPoint.filename].last_push) {
+			dp.last_time_file[tsdPoint.filename] = currentFileInfo
 		}
 	}
 

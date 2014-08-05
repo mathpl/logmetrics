@@ -8,6 +8,7 @@ import (
 	"log/syslog"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/mathpl/golang-pkg-pcre/src/pkg/pcre"
 	"launchpad.net/~niemeyer/goyaml/beta"
@@ -101,7 +102,7 @@ func (conf *Config) GetSyslogFacility() syslog.Priority {
 func (lg *LogGroup) CreateDataPool(channel_number int, tsd_pushers []chan []string, tsd_channel_number int) *DataPool {
 	var dp DataPool
 	dp.Bye = make(chan bool)
-	dp.duplicateSent = make(map[string]bool)
+	dp.duplicateSent = make(map[string]*time.Time)
 
 	dp.channel_number = channel_number
 	dp.tail_data = lg.tail_data[channel_number]
@@ -114,6 +115,8 @@ func (lg *LogGroup) CreateDataPool(channel_number int, tsd_pushers []chan []stri
 	dp.last_time_file = make(map[string]fileInfo)
 
 	dp.lg = lg
+
+	dp.compileTagOrder()
 
 	return &dp
 }
