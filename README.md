@@ -346,14 +346,11 @@ Since I moved away from the default regex package in favor of libpcre (for a vas
 
 List of tasks pending related to logmetrics-collector.
 
-- Patch tcollector to allow default tags to be overridden. (class, product and cluster specifically) -Done
-- Add arithmetic for metric values. -Done
-  - The time histogram of "resource=self" should be the time spent on the server minus the time of every other resources. Currently it's the total call time make the graph omitting the resource tag incorrect. -Done
-- Recover gracefully from panics (if any)
 - Persist file tailer position and datapool to disk to enable downtime without side effect.
 - Push internal metrics to TSD: Mem usage, GC info, key/data sent, data pool size, line parsed, etc. -Half-done
 - Clean up go-metrics remains.
-- Clean up data structures.
+- Clean up data structures. - 1/3 done
+- Tests!
 
 
 Many thanks to Kieren Hynd for the idea and input!
