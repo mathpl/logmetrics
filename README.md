@@ -146,7 +146,7 @@ Here's the configuration for fictional service.  Comments inline. It's in json-l
     goroutines: 1,
 
     # Poll the file instead of using inotify. Defaults to false.
-	# Last I checked it leaks FD on log rotation, be careful.
+	# Last I checked inotify leaks FD on log rotation, so use true.
     poll_file: true,
 
     #Push data to TSD every X seconds. Default to 15.
@@ -284,6 +284,44 @@ It will also push internal processing stats under the following keys and tags:
   - pusher_number: pusher number when multiple ones are used.
 
 Additionnaly all internal processing keys have the current host's hostname tag added.
+
+<h2>Understanding stale/dupes options</h2>
+
+To get OpenTSDB a aggregate data in a meaningful way while keeping the process' footprint as low as possible a few options have been added:
+- stale_removal: If you use certain regexp match group as tag and you know a good amount will not show up that often you might want to flush them from logmetrics' memory. The upside is it's easier to keep the cpu/memory usage on the low side, the downside is that some aggregation might suffer from disappearing tag. Your call!
+- stale_threshold_min: How many minutes without update until the metrics is considered stale and is flushed.
+- send_duplicates: With enough diverisity with tag content there comes a point where a large amount of them won't be updated every "interval" and thus makes OpenTSDB's aggregation go wild, especially avg. Sending keys only when they are updated also has the side-effect of generating an interpolated line between the last value and the new one which can be in fact very misleading, especially on counts. This options will make logmetrics send duplicate data with the latest timestamp instead of only when that specific metrics was last update. Makes for nicer live graph.
+- live_poll: logmetrics aims at both dealing with old logs files for forensics puposes and live logs, all this without looking at the actual system time since it would make dealing with lagging logs/process/etc more tricky than it should. Thus the mechanic to decide if a key can be flushed or if the time interval has passed and it's time to send metrics ended up needing to be different. So if you' pushing old logs, set this to false, on live logs true!
+
+All these options do not necesseraly play nice together, here's some recipes:
+
+Live logs parsing with stale metric flushing and duplicate sending:
+- stale_removal: true
+- stale_threshold_min: 10
+- send_duplicates: true
+- live_poll: true
+- parse_from_start: false
+
+Live logs parsing without stale metric flushing but with duplicate sending:
+- stale_removal: false
+- send_duplicates: true
+- live_poll: true
+- parse_from_start: false
+
+Live logs parsing without stale metric flushing nor duplicate sending:
+- stale_removal: false
+- send_duplicates: false
+- live_poll: true
+- parse_from_start: false
+
+Old logs parsing:
+- stale_removal: false
+- send_duplicates: false
+- live_poll: false
+- parse_from_start: true
+
+Note the neither stale_removal nor send_duplicate should be used when parsing old logs, the behaviour isn't defined over mulitple log files.
+
 
 <h2>Internal structure</h2>
 

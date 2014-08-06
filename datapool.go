@@ -236,7 +236,7 @@ func (dp *DataPool) start() {
 
 				//Support for log playback - Push when <interval> has pass in the logs, not real time
 				run_push_keys := false
-				if dp.lg.stale_removal && point_time.Sub(*last_time_pushed) >= time.Duration(dp.lg.interval)*time.Second {
+				if dp.lg.live_poll && point_time.Sub(*last_time_pushed) >= time.Duration(dp.lg.interval)*time.Second {
 					run_push_keys = true
 				} else if !dp.lg.stale_removal {
 					// Check for each file individually

@@ -64,6 +64,7 @@ type LogGroup struct {
 	goroutines int
 	interval   int
 	poll_file  bool
+	live_poll  bool
 
 	fail_operation_warn    bool
 	fail_regex_warn        bool
@@ -357,6 +358,8 @@ func LoadConfig(configFile string) Config {
 					lg.out_of_order_time_warn = v
 				case "poll_file":
 					lg.poll_file = v
+				case "live_poll":
+					lg.live_poll = v
 				case "stale_removal":
 					lg.stale_removal = v
 				case "send_duplicates":
