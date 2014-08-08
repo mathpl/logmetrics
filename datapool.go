@@ -294,7 +294,7 @@ func (dp *DataPool) pushKeys(point_time time.Time) (int, int) {
 			currentFileInfo.last_push = tsdPoint.last_push
 
 			// When sending duplicate use the current time instead of the last updated time of the metric.
-			keys = pointData.GetKeys(point_time, tsd_key, dp.lg.send_duplicates)
+			keys = pointData.GetKeys(point_time, tsd_key, dp.lg.live_poll)
 		}
 
 		if dp.lg.send_duplicates {
@@ -311,7 +311,7 @@ func (dp *DataPool) pushKeys(point_time time.Time) (int, int) {
 				//} else if dp.duplicateSent[tsd_key] == nil {
 				//} else {
 				// No duplicate has been sent already
-				keys = pointData.GetKeys(point_time, tsd_key, dp.lg.send_duplicates)
+				keys = pointData.GetKeys(point_time, tsd_key, true)
 				dp.duplicateSent[tsd_key] = &point_time
 			}
 		}
