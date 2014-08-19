@@ -2,10 +2,11 @@ package logmetrics
 
 import (
 	"fmt"
-	"github.com/mathpl/tail"
 	"log"
 	"path/filepath"
 	"time"
+
+	"github.com/mathpl/tail"
 )
 
 type tailStats struct {
@@ -57,6 +58,12 @@ func tailFile(channel_number int, filename string, lg *LogGroup, tsd_pusher chan
 
 	maxMatches := lg.expected_matches + 1
 
+	var filename_matches []string
+	if lg.filename_match_re != nil {
+		m := lg.filename_match_re.MatcherString(filename, 0)
+		filename_matches = m.ExtractString()[1:]
+	}
+
 	//os.Seek end of file descriptor
 	seekParam := 2
 	if lg.parse_from_start {
@@ -83,9 +90,13 @@ func tailFile(channel_number int, filename string, lg *LogGroup, tsd_pusher chan
 		match_one := false
 		for _, re := range lg.re {
 			m := re.MatcherString(line.Text, 0)
-			matches := m.Extract()
+			matches := m.ExtractString()
 			if len(matches) == maxMatches {
 				match_one = true
+				if filename_matches != nil {
+					matches = append(matches, filename_matches[:]...)
+				}
+
 				results := lineResult{filename, matches}
 				lg.tail_data[channel_number] <- results
 				tail_stats.incLineMatch()

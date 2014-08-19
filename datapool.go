@@ -1,6 +1,7 @@
 package logmetrics
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 	"sort"
@@ -78,6 +79,53 @@ func (dp *DataPool) extractTags(data []string) []string {
 	return tags
 }
 
+func build_replace_map(data []string) map[string]string {
+	r := make(map[string]string)
+
+	for pos, s := range data {
+		r[fmt.Sprintf("%d", pos)] = s
+	}
+
+	return r
+}
+
+func (dp *DataPool) applyTransforms(match_groups []string) []string {
+	transformed_matches := make([]string, len(match_groups))
+
+	for pos, data := range match_groups {
+		if transform, ok := dp.lg.transform[pos]; ok {
+			for _, operation := range transform.ops {
+				got_match := false
+				switch op := operation.(type) {
+				case replace:
+					if (transform.replace_only_one && !got_match) || !transform.replace_only_one {
+						m := op.matcher.MatcherString(data, 0)
+						got_match = m.Matches()
+						if got_match {
+							var buf bytes.Buffer
+
+							replace_map := build_replace_map(m.ExtractString())
+							op.replacer.Replace(&buf, replace_map)
+							data = buf.String()
+						}
+					}
+				case match_or_default:
+					m := op.matcher.Matcher([]byte(data), 0)
+					if !m.Matches() {
+						if transform.log_default_assign {
+							log.Printf("Assigning default value to: %s", data)
+						}
+						data = op.default_val
+					}
+				}
+			}
+		}
+		transformed_matches[pos] = data
+	}
+
+	return transformed_matches
+}
+
 func (dp *DataPool) getKeys(data []string) ([]dataPoint, time.Time) {
 	y := time.Now().Year()
 
@@ -131,7 +179,7 @@ func (dp *DataPool) getKeys(data []string) ([]dataPoint, time.Time) {
 		}
 	}
 
-	//Second pass applies operation and create datapoints
+	// Second pass applies operation and create datapoints
 	var i = 0
 	for position, val := range values {
 		//Is the value a metric?
@@ -190,7 +238,10 @@ func (dp *DataPool) start() {
 				log.Printf("Datapool[%s:%d] stopping.", dp.lg.name, dp.channel_number)
 				return
 			case line_result := <-dp.tail_data:
-				data_points, point_time := dp.getKeys(line_result.matches)
+
+				transformed_matches := dp.applyTransforms(line_result.matches)
+
+				data_points, point_time := dp.getKeys(transformed_matches)
 
 				if currentFileInfo, ok := dp.last_time_file[line_result.filename]; ok {
 					if currentFileInfo.lastUpdate.Before(point_time) {

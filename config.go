@@ -28,6 +28,17 @@ type Config struct {
 	logGroups map[string]*LogGroup
 }
 
+//type match struct {
+//	str     string
+//	matcher *pcre.Regexp
+//}
+//
+//func (m *match) apply(str string) (bool, string) {
+//	result := m.matcher.MatcherString(str, 0)
+//
+//	return result.Matches(), ""
+//}
+
 type KeyExtract struct {
 	tag         string
 	metric_type string
@@ -39,12 +50,14 @@ type KeyExtract struct {
 }
 
 type LogGroup struct {
-	name             string
-	globFiles        []string
-	re               []*pcre.Regexp
-	strRegexp        []string
-	expected_matches int
-	hostname         string
+	name              string
+	globFiles         []string
+	filename_match    string
+	filename_match_re *pcre.Regexp
+	re                []*pcre.Regexp
+	strRegexp         []string
+	expected_matches  int
+	hostname          string
 
 	date_position int
 	date_format   string
@@ -52,6 +65,7 @@ type LogGroup struct {
 	key_prefix string
 	tags       map[string]int
 	metrics    map[int][]KeyExtract
+	transform  map[int]transform
 
 	histogram_size                  int
 	histogram_alpha_decay           float64
@@ -156,8 +170,9 @@ func parseMetrics(conf map[interface{}]interface{}) map[int][]KeyExtract {
 	keyExtracts := make(map[int][]KeyExtract)
 
 	for metric_type, metrics := range conf {
-		switch m := metrics.(type) {
-		case map[interface{}]interface{}:
+		for _, n := range metrics.([]interface{}) {
+			m := n.(map[interface{}]interface{})
+
 			key_suffix := m["key_suffix"].(string)
 
 			var format string
@@ -173,7 +188,7 @@ func parseMetrics(conf map[interface{}]interface{}) map[int][]KeyExtract {
 				multiply = 1
 			}
 
-			for _, val := range m["data"].([]interface{}) {
+			for _, val := range m["reference"].([]interface{}) {
 				position := val.([]interface{})[0].(int)
 				tag := val.([]interface{})[1].(string)
 
@@ -195,11 +210,9 @@ func parseMetrics(conf map[interface{}]interface{}) map[int][]KeyExtract {
 
 				newKey := KeyExtract{tag: tag, metric_type: metric_type.(string), key_suffix: key_suffix,
 					format: format, multiply: multiply, operations: operations}
-
 				keyExtracts[position] = append(keyExtracts[position], newKey)
 			}
 		}
-
 	}
 
 	return keyExtracts
@@ -312,6 +325,11 @@ func LoadConfig(configFile string) Config {
 				case "key_prefix":
 					lg.key_prefix = v
 
+				case "filename_match":
+					lg.filename_match = v
+					re := pcre.MustCompile(v, 0)
+					lg.filename_match_re = &re
+
 				default:
 					log.Fatalf("Unknown key %s.%s", name, key)
 				}
@@ -411,6 +429,9 @@ func LoadConfig(configFile string) Config {
 							log.Fatalf("Unknown key %s.date.%s", name, date_name)
 						}
 					}
+
+				case "transform":
+					lg.transform = parseTransform(v)
 
 				default:
 					log.Fatalf("Unknown key %s.%s", name, key)
