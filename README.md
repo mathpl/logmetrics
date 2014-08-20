@@ -37,11 +37,11 @@ Distribution of minimum time spent by resource for calls + total time spent (sum
 - Low resource usage.
   - This is directly dependent on the configuration used and the number of keys tracked and activity in the logs.
 - Easy to deploy: a single statically compiled binary.
-- Written in Go.
+- Integrated pprof output. See -P and http://blog.golang.org/profiling-go-programs.
 
 <h2>Configuration</h2>
 
-Here's the configuration for fictional service.  Comments inline. It's in json-like yaml.
+Here's a simple configuration for fictional service.  Comments inline. It's in json-like yaml.
 ```
 {
   # Log group, you can define multiple of these
@@ -87,41 +87,43 @@ Here's the configuration for fictional service.  Comments inline. It's in json-l
 
     # Metrics definition. Only meter and histogram are supported
     metrics: {
-      meter: {
-        # Key suffix to use for this type of metric.
-        # The metric itself will then append multiple endings to this.
-        key_suffix: "executions",
+      meter: [
+        { # Key suffix to use for this type of metric.
+          # The metric itself will then append multiple endings to this.
+          key_suffix: "executions",
 
-        # float or int. Defaults to int
-        format: "int"
+          # float or int. Defaults to int
+          format: "int"
 
-        # Multiply the value by this. Defaults to 1. Useful for time in float.
-        multiply: 1
+          # Multiply the value by this. Defaults to 1. Useful for time in float.
+          multiply: 1
 
-        # Regexp match groups where to use this metric type + tag(s) to append for it
-        data: [
-          [0,  "resource=local"], #When pos=0, simply inc counter by 1
-          [7,  "resource=bnt"],
-          [9,  "resource=sql"],
-          [11,  "resource=membase"],
-          [13, "resource=memcache"],
-          [15, "resource=other"]
-        ]
-      },
-      histogram: {
-        key_suffix: "execution_time.ms",
-        data: [
-          # Operations add or sub can be applied to the value. Here we substract all the
-          # resource accesses from the total time so we only have the time spent on the server.
-          [6,  "resource=local" , {sub: [8,10,12,14,16]}],
-          [6,  "resource=total" ],
-          [8,  "resource=bnt"],
-          [10,  "resource=sql"],
-          [12, "resource=membase"],
-          [14, "resource=memcache"],
-          [16, "resource=other"]
-        ]
-      }
+          # Regexp match groups where to use this metric type + tag(s) to append for it
+          reference: [
+            [0,  "resource=local"], #When pos=0, simply inc counter by 1
+            [7,  "resource=bnt"],
+            [9,  "resource=sql"],
+            [11,  "resource=membase"],
+            [13, "resource=memcache"],
+            [15, "resource=other"]
+          ]
+        }
+      ],
+      histogram: [
+        { key_suffix: "execution_time.ms",
+          reference: [
+            # Operations add or sub can be applied to the value. Here we substract all the
+            # resource accesses from the total time so we only have the time spent on the server.
+            [6,  "resource=local" , {sub: [8,10,12,14,16]}],
+            [6,  "resource=total" ],
+            [8,  "resource=bnt"],
+            [10,  "resource=sql"],
+            [12, "resource=membase"],
+            [14, "resource=memcache"],
+            [16, "resource=other"]
+          ]
+        }
+      ]
     },
 
     # Histogram sampler parameters. See Exponential Decay in http://dimacs.rutgers.edu/~graham/pubs/papers/fwddecay.pdf
@@ -322,6 +324,10 @@ Old logs parsing:
 
 Note the neither stale_removal nor send_duplicate should be used when parsing old logs, the behaviour isn't defined over mulitple log files.
 
+
+<h2>Transform</h2>
+
+To deal with more unruly log files there's a way to modify match groups before using them. Check logmetrics_collector_transform.conf for an example of a config file parsing apache logs with url cleanup so we can use it as tag.
 
 <h2>Internal structure</h2>
 
