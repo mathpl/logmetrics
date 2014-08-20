@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"runtime/pprof"
 	"syscall"
+	"time"
 
 	"github.com/mathpl/logmetrics"
 )
@@ -108,6 +109,7 @@ func main() {
 		pprof.StopCPUProfile()
 		pf.Close()
 		log.Print("Stopped profiler")
+		time.Sleep(time.Duration(10 * time.Second))
 	}
 
 	log.Print("All stopped")
