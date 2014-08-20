@@ -9,7 +9,6 @@ import (
 	"runtime"
 	"runtime/pprof"
 	"syscall"
-	"time"
 
 	"github.com/mathpl/logmetrics"
 )
@@ -18,16 +17,16 @@ var configFile = flag.String("c", "/etc/logmetrics_collector.conf", "Full path t
 var threads = flag.Int("j", 1, "Thread count.")
 var logToConsole = flag.Bool("d", false, "Print to console.")
 var doNotSend = flag.Bool("D", false, "Print data instead of sending over network.")
-var profile = flag.Bool("P", false, "Create pprof file for each goroutine.")
+var profile = flag.String("P", "", "Create a pprof file with this filename.")
 
 func main() {
 	//Process execution flags
 	flag.Parse()
 
 	var pf *os.File
-	if *profile {
+	if *profile != "" {
 		var err error
-		pf, err = os.Create("logmetrics_collector.pprof")
+		pf, err = os.Create(*profile)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -105,12 +104,11 @@ func main() {
 		ps.Bye <- true
 	}
 
-	if *profile {
+	if *profile != "" {
 		pprof.StopCPUProfile()
 		pf.Close()
 		log.Print("Stopped profiler")
-		// Give a chance to goroutines to stop correctly when profiling
-		time.Sleep(time.Duration(10 * time.Second))
 	}
+
 	log.Print("All stopped")
 }
