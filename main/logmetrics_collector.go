@@ -7,7 +7,9 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"runtime/pprof"
 	"syscall"
+	"time"
 
 	"github.com/mathpl/logmetrics"
 )
@@ -22,7 +24,17 @@ func main() {
 	//Process execution flags
 	flag.Parse()
 
-	logmetrics.Profile = *profile
+	var pf *os.File
+	if *profile {
+		var err error
+		pf, err = os.Create("logmetrics_collector.pprof")
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		log.Print("Starting profiler")
+		pprof.StartCPUProfile(pf)
+	}
 
 	//Channel to stop the program
 	stop := make(chan bool)
@@ -93,6 +105,12 @@ func main() {
 		ps.Bye <- true
 	}
 
-	//time.Sleep(time.Duration(1 * time.Second))
+	if *profile {
+		pprof.StopCPUProfile()
+		pf.Close()
+		log.Print("Stopped profiler")
+		// Give a chance to goroutines to stop correctly when profiling
+		time.Sleep(time.Duration(10 * time.Second))
+	}
 	log.Print("All stopped")
 }
