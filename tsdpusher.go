@@ -7,6 +7,17 @@ import (
 	"time"
 )
 
+type pusher struct {
+	cfg            *Config
+	tsd_push       chan []string
+	do_not_send    bool
+	channel_number int
+	hostname       string
+	key_push_stats keyPushStats
+
+	Bye chan bool
+}
+
 type keyPushStats struct {
 	key_pushed    int64
 	byte_pushed   int64
@@ -37,7 +48,7 @@ func (f *keyPushStats) isTimeForStats() bool {
 	return time.Now().Sub(f.last_report) > time.Duration(f.interval)*time.Second
 }
 
-func writeLine(config *Config, doNotSend bool, conn net.Conn, line string) (int, net.Conn) {
+func writeLine(config *Config, do_not_send bool, conn net.Conn, line string) (int, net.Conn) {
 	if config.pushType == "tsd" {
 		line = ("put " + line + "\n")
 	} else {
@@ -48,8 +59,8 @@ func writeLine(config *Config, doNotSend bool, conn net.Conn, line string) (int,
 	byte_written := len(byte_line)
 
 	var err error
-	if doNotSend {
-		fmt.Print(line)
+	if do_not_send {
+		fmt.Print(line + "\n")
 	} else {
 		for {
 			//Reconnect if needed
@@ -82,57 +93,54 @@ func writeLine(config *Config, doNotSend bool, conn net.Conn, line string) (int,
 	return byte_written, conn
 }
 
-func StartTsdPushers(config *Config, tsd_pushers []chan []string, doNotSend bool) {
+func (p *pusher) start() {
+	log.Printf("TsdPusher[%d] started. Pushing keys to %s:%d over %s in %s format", p.channel_number, p.cfg.pushHost,
+		p.cfg.pushPort, p.cfg.pushProto, p.cfg.pushType)
+
+	p.key_push_stats = keyPushStats{last_report: time.Now(), hostname: p.hostname, interval: p.cfg.stats_interval, pusher_number: p.channel_number}
+
+	var conn net.Conn
+	for {
+		select {
+		case keys := <-p.tsd_push:
+			for _, line := range keys {
+				var bytes_written int
+				bytes_written, conn = writeLine(p.cfg, p.do_not_send, conn, line)
+
+				p.key_push_stats.inc(bytes_written)
+
+				//Stats on key pushed, limit checks with modulo (now() is a syscall)
+				if (p.key_push_stats.key_pushed%100) == 0 && p.key_push_stats.isTimeForStats() {
+					for _, local_line := range p.key_push_stats.getLine() {
+						bytes_written, conn = writeLine(p.cfg, p.do_not_send, conn, local_line)
+						p.key_push_stats.inc(bytes_written)
+					}
+				}
+			}
+		case <-p.Bye:
+			log.Printf("TsdPusher[%d] stopped.", p.channel_number)
+			return
+		}
+	}
+}
+
+func StartTsdPushers(config *Config, tsd_pushers []chan []string, do_not_send bool) []*pusher {
 	if config.pushPort == 0 {
-		return
+		return nil
 	}
 
 	hostname := getHostname()
 
+	allPushers := make([]*pusher, 0)
 	for i, _ := range tsd_pushers {
 		channel_number := i
 
-		log.Printf("TsdPusher[%d] started. Pushing keys to %s:%d over %s in %s format", channel_number, config.pushHost,
-			config.pushPort, config.pushProto, config.pushType)
-
 		tsd_push := tsd_pushers[channel_number]
-		go func() {
-			key_push_stats := keyPushStats{last_report: time.Now(), hostname: hostname, interval: config.stats_interval, pusher_number: channel_number}
-
-			//Check if TSD has something to say
-			//if config.pushType == "tsd" {
-			//	go func() {
-			//		response_buffer := make([]byte, 1024)
-			//		for {
-			//			if conn != nil {
-			//				if size, read_err := conn.Read(response_buffer); read_err != nil && read_err != io.EOF {
-			//					log.Printf("Unable to read response: %s %+V", read_err, read_err)
-			//				} else if size > 0 {
-			//					log.Print(string(response_buffer))
-			//				}
-			//			}
-			//		}
-			//	}()
-			//}
-
-			var conn net.Conn
-			for keys := range tsd_push {
-				for _, line := range keys {
-					var bytes_written int
-					bytes_written, conn = writeLine(config, doNotSend, conn, line)
-
-					key_push_stats.inc(bytes_written)
-
-					//Stats on key pushed, limit checks with modulo (now() is a syscall)
-					if (key_push_stats.key_pushed%100) == 0 && key_push_stats.isTimeForStats() {
-						for _, local_line := range key_push_stats.getLine() {
-							bytes_written, conn = writeLine(config, doNotSend, conn, local_line)
-							key_push_stats.inc(bytes_written)
-						}
-					}
-				}
-			}
-
-		}()
+		bye := make(chan bool)
+		p := pusher{cfg: config, tsd_push: tsd_push, hostname: hostname, do_not_send: do_not_send, channel_number: channel_number, Bye: bye}
+		go p.start()
+		allPushers = append(allPushers, &p)
 	}
+
+	return allPushers
 }

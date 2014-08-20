@@ -25,10 +25,21 @@ type Config struct {
 	stats_interval int
 	logFacility    syslog.Priority
 
-	logGroups map[string]*LogGroup
+	logGroups map[string]*logGroup
 }
 
-type KeyExtract struct {
+//type match struct {
+//	str     string
+//	matcher *pcre.Regexp
+//}
+//
+//func (m *match) apply(str string) (bool, string) {
+//	result := m.matcher.MatcherString(str, 0)
+//
+//	return result.Matches(), ""
+//}
+
+type keyExtract struct {
 	tag         string
 	metric_type string
 	key_suffix  string
@@ -38,20 +49,23 @@ type KeyExtract struct {
 	operations map[string][]int
 }
 
-type LogGroup struct {
-	name             string
-	globFiles        []string
-	re               []*pcre.Regexp
-	strRegexp        []string
-	expected_matches int
-	hostname         string
+type logGroup struct {
+	name              string
+	globFiles         []string
+	filename_match    string
+	filename_match_re *pcre.Regexp
+	re                []*pcre.Regexp
+	strRegexp         []string
+	expected_matches  int
+	hostname          string
 
 	date_position int
 	date_format   string
 
 	key_prefix string
 	tags       map[string]int
-	metrics    map[int][]KeyExtract
+	metrics    map[int][]keyExtract
+	transform  map[int]transform
 
 	histogram_size                  int
 	histogram_alpha_decay           float64
@@ -76,11 +90,11 @@ type LogGroup struct {
 	tail_data []chan lineResult
 }
 
-func (lg *LogGroup) getNbTags() int {
+func (lg *logGroup) getNbTags() int {
 	return len(lg.tags)
 }
 
-func (lg *LogGroup) getNbKeys() int {
+func (lg *logGroup) getNbKeys() int {
 	i := 0
 	for _, metrics := range lg.metrics {
 		i += len(metrics)
@@ -100,8 +114,8 @@ func (conf *Config) GetSyslogFacility() syslog.Priority {
 	return conf.logFacility
 }
 
-func (lg *LogGroup) CreateDataPool(channel_number int, tsd_pushers []chan []string, tsd_channel_number int) *DataPool {
-	var dp DataPool
+func (lg *logGroup) CreateDataPool(channel_number int, tsd_pushers []chan []string, tsd_channel_number int) *datapool {
+	var dp datapool
 	dp.Bye = make(chan bool)
 	dp.duplicateSent = make(map[string]*time.Time)
 
@@ -152,12 +166,13 @@ func cleanSre2(log_group_name string, re string) (string, *pcre.Regexp, error) {
 	}
 }
 
-func parseMetrics(conf map[interface{}]interface{}) map[int][]KeyExtract {
-	keyExtracts := make(map[int][]KeyExtract)
+func parseMetrics(conf map[interface{}]interface{}) map[int][]keyExtract {
+	keyExtracts := make(map[int][]keyExtract)
 
 	for metric_type, metrics := range conf {
-		switch m := metrics.(type) {
-		case map[interface{}]interface{}:
+		for _, n := range metrics.([]interface{}) {
+			m := n.(map[interface{}]interface{})
+
 			key_suffix := m["key_suffix"].(string)
 
 			var format string
@@ -173,7 +188,7 @@ func parseMetrics(conf map[interface{}]interface{}) map[int][]KeyExtract {
 				multiply = 1
 			}
 
-			for _, val := range m["data"].([]interface{}) {
+			for _, val := range m["reference"].([]interface{}) {
 				position := val.([]interface{})[0].(int)
 				tag := val.([]interface{})[1].(string)
 
@@ -193,13 +208,11 @@ func parseMetrics(conf map[interface{}]interface{}) map[int][]KeyExtract {
 					}
 				}
 
-				newKey := KeyExtract{tag: tag, metric_type: metric_type.(string), key_suffix: key_suffix,
+				newKey := keyExtract{tag: tag, metric_type: metric_type.(string), key_suffix: key_suffix,
 					format: format, multiply: multiply, operations: operations}
-
 				keyExtracts[position] = append(keyExtracts[position], newKey)
 			}
 		}
-
 	}
 
 	return keyExtracts
@@ -222,7 +235,7 @@ func LoadConfig(configFile string) Config {
 	settings := rawCfg.(map[interface{}]interface{})["settings"]
 
 	var cfg Config
-	cfg.logGroups = make(map[string]*LogGroup)
+	cfg.logGroups = make(map[string]*logGroup)
 
 	//Settings
 	for key, val := range settings.(map[interface{}]interface{}) {
@@ -299,7 +312,7 @@ func LoadConfig(configFile string) Config {
 			continue
 		}
 
-		var lg LogGroup
+		var lg logGroup
 
 		lg.name = name.(string)
 		lg.tags = make(map[string]int)
@@ -311,6 +324,11 @@ func LoadConfig(configFile string) Config {
 				switch key {
 				case "key_prefix":
 					lg.key_prefix = v
+
+				case "filename_match":
+					lg.filename_match = v
+					re := pcre.MustCompile(v, 0)
+					lg.filename_match_re = &re
 
 				default:
 					log.Fatalf("Unknown key %s.%s", name, key)
@@ -411,6 +429,9 @@ func LoadConfig(configFile string) Config {
 							log.Fatalf("Unknown key %s.date.%s", name, date_name)
 						}
 					}
+
+				case "transform":
+					lg.transform = parseTransform(v)
 
 				default:
 					log.Fatalf("Unknown key %s.%s", name, key)

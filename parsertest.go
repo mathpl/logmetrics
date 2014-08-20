@@ -42,7 +42,7 @@ func (f *readStats) isTimeForStats(interval int) bool {
 	return (time.Now().Sub(f.last_report) > time.Duration(interval)*time.Second)
 }
 
-func parserTest(filename string, lg *LogGroup, perfInfo bool) {
+func parserTest(filename string, lg *logGroup, perfInfo bool) {
 	maxMatches := lg.expected_matches + 1
 
 	file, err := os.Open(filename)
@@ -63,7 +63,7 @@ func parserTest(filename string, lg *LogGroup, perfInfo bool) {
 		match_one := false
 		for _, re := range lg.re {
 			m := re.MatcherString(line, 0)
-			matches := m.Extract()
+			matches := m.ExtractString()
 			if len(matches) == maxMatches {
 
 				match_one = true
@@ -84,7 +84,7 @@ func parserTest(filename string, lg *LogGroup, perfInfo bool) {
 	log.Printf("Finished parsing %s.", filename)
 }
 
-func startLogGroupParserTest(logGroup *LogGroup, perfInfo bool) {
+func startlogGroupParserTest(logGroup *logGroup, perfInfo bool) {
 
 	newFiles := make(map[string]bool)
 	for _, glob := range logGroup.globFiles {
@@ -105,10 +105,10 @@ func startLogGroupParserTest(logGroup *LogGroup, perfInfo bool) {
 
 }
 
-func StartParserTest(config *Config, selectedLogGroup string, perfInfo bool) {
+func StartParserTest(config *Config, selectedlogGroup string, perfInfo bool) {
 	for logGroupName, logGroup := range config.logGroups {
-		if selectedLogGroup == "" || logGroupName == selectedLogGroup {
-			startLogGroupParserTest(logGroup, perfInfo)
+		if selectedlogGroup == "" || logGroupName == selectedlogGroup {
+			startlogGroupParserTest(logGroup, perfInfo)
 		}
 	}
 }
