@@ -90,6 +90,9 @@ type logGroup struct {
 	tail_data []chan lineResult
 }
 
+// Global var as profiling switch
+var Profile = false
+
 func (lg *logGroup) getNbTags() int {
 	return len(lg.tags)
 }

@@ -204,93 +204,90 @@ func (dp *datapool) getStatsKey(timePush time.Time) []string {
 func (dp *datapool) start() {
 	log.Printf("Datapool[%s:%d] started. Pushing keys to TsdPusher[%d]", dp.lg.name, dp.channel_number, dp.tsd_channel_number)
 
-	//Start the handler
-	go func() {
-		var last_time_pushed *time.Time
-		var lastTimeStatsPushed time.Time
-		for {
-			select {
-			case <-dp.Bye:
-				log.Printf("Datapool[%s:%d] stopping.", dp.lg.name, dp.channel_number)
-				return
-			case line_result := <-dp.tail_data:
+	var last_time_pushed *time.Time
+	var lastTimeStatsPushed time.Time
+	for {
+		select {
+		case line_result := <-dp.tail_data:
 
-				transformed_matches := dp.applyTransforms(line_result.matches)
+			transformed_matches := dp.applyTransforms(line_result.matches)
 
-				data_points, point_time := dp.getKeys(transformed_matches)
+			data_points, point_time := dp.getKeys(transformed_matches)
 
-				if currentFileInfo, ok := dp.last_time_file[line_result.filename]; ok {
-					if currentFileInfo.lastUpdate.Before(point_time) {
-						currentFileInfo.lastUpdate = point_time
-					}
-				} else {
-					dp.last_time_file[line_result.filename] = fileInfo{lastUpdate: point_time}
+			if currentFileInfo, ok := dp.last_time_file[line_result.filename]; ok {
+				if currentFileInfo.lastUpdate.Before(point_time) {
+					currentFileInfo.lastUpdate = point_time
 				}
+			} else {
+				dp.last_time_file[line_result.filename] = fileInfo{lastUpdate: point_time}
+			}
 
-				//To start things off
-				if last_time_pushed == nil {
-					last_time_pushed = &point_time
-				}
+			//To start things off
+			if last_time_pushed == nil {
+				last_time_pushed = &point_time
+			}
 
-				for _, data_point := range data_points {
-					//New metrics, add
-					if _, ok := dp.data[data_point.name]; !ok {
-						switch data_point.metric_type {
-						case "histogram":
-							s := timemetrics.NewExpDecaySample(point_time, dp.lg.histogram_size, dp.lg.histogram_alpha_decay, dp.lg.histogram_rescale_threshold_min)
-							dp.data[data_point.name] = &tsdPoint{data: timemetrics.NewHistogram(s, dp.lg.stale_treshold_min),
-								filename: line_result.filename}
-						case "counter":
-							dp.data[data_point.name] = &tsdPoint{data: timemetrics.NewCounter(point_time, dp.lg.stale_treshold_min),
-								filename: line_result.filename}
-						case "meter":
-							dp.data[data_point.name] = &tsdPoint{data: timemetrics.NewMeter(point_time, dp.lg.ewma_interval, dp.lg.stale_treshold_min),
-								filename: line_result.filename}
-						default:
-							log.Fatalf("Unexpected metric type %s!", data_point.metric_type)
-						}
-					}
-
-					//Make sure data is ordered or we risk sending duplicate data
-					if dp.data[data_point.name].last_push.After(point_time) && dp.lg.out_of_order_time_warn {
-						log.Printf("Non-ordered data detected in log file. Its key already had a update at %s in the future. Offending line: %s",
-							dp.data[data_point.name].last_push, line_result.matches[0])
-					}
-
-					dp.data[data_point.name].data.Update(point_time, data_point.value)
-					dp.data[data_point.name].filename = line_result.filename
-				}
-
-				//Support for log playback - Push when <interval> has pass in the logs, not real time
-				run_push_keys := false
-				if dp.lg.live_poll && point_time.Sub(*last_time_pushed) >= time.Duration(dp.lg.interval)*time.Second {
-					run_push_keys = true
-				} else if !dp.lg.stale_removal {
-					// Check for each file individually
-					for _, fileInfo := range dp.last_time_file {
-						if point_time.Sub(fileInfo.last_push) >= time.Duration(dp.lg.interval)*time.Second {
-							run_push_keys = true
-							break
-						}
+			for _, data_point := range data_points {
+				//New metrics, add
+				if _, ok := dp.data[data_point.name]; !ok {
+					switch data_point.metric_type {
+					case "histogram":
+						s := timemetrics.NewExpDecaySample(point_time, dp.lg.histogram_size, dp.lg.histogram_alpha_decay, dp.lg.histogram_rescale_threshold_min)
+						dp.data[data_point.name] = &tsdPoint{data: timemetrics.NewHistogram(s, dp.lg.stale_treshold_min),
+							filename: line_result.filename}
+					case "counter":
+						dp.data[data_point.name] = &tsdPoint{data: timemetrics.NewCounter(point_time, dp.lg.stale_treshold_min),
+							filename: line_result.filename}
+					case "meter":
+						dp.data[data_point.name] = &tsdPoint{data: timemetrics.NewMeter(point_time, dp.lg.ewma_interval, dp.lg.stale_treshold_min),
+							filename: line_result.filename}
+					default:
+						log.Fatalf("Unexpected metric type %s!", data_point.metric_type)
 					}
 				}
 
-				if run_push_keys {
-					var nb_stale int
-					dp.total_keys, nb_stale = dp.pushKeys(point_time)
-					dp.total_stale += nb_stale
+				//Make sure data is ordered or we risk sending duplicate data
+				if dp.data[data_point.name].last_push.After(point_time) && dp.lg.out_of_order_time_warn {
+					log.Printf("Non-ordered data detected in log file. Its key already had a update at %s in the future. Offending line: %s",
+						dp.data[data_point.name].last_push, line_result.matches[0])
+				}
 
-					//Push stats as well?
-					if point_time.Sub(lastTimeStatsPushed) > time.Duration(dp.lg.interval)*time.Second {
-						dp.tsd_push <- dp.getStatsKey(point_time)
-						lastTimeStatsPushed = point_time
+				dp.data[data_point.name].data.Update(point_time, data_point.value)
+				dp.data[data_point.name].filename = line_result.filename
+			}
+
+			//Support for log playback - Push when <interval> has pass in the logs, not real time
+			run_push_keys := false
+			if dp.lg.live_poll && point_time.Sub(*last_time_pushed) >= time.Duration(dp.lg.interval)*time.Second {
+				run_push_keys = true
+			} else if !dp.lg.stale_removal {
+				// Check for each file individually
+				for _, fileInfo := range dp.last_time_file {
+					if point_time.Sub(fileInfo.last_push) >= time.Duration(dp.lg.interval)*time.Second {
+						run_push_keys = true
+						break
 					}
-
-					last_time_pushed = &point_time
 				}
 			}
+
+			if run_push_keys {
+				var nb_stale int
+				dp.total_keys, nb_stale = dp.pushKeys(point_time)
+				dp.total_stale += nb_stale
+
+				//Push stats as well?
+				if point_time.Sub(lastTimeStatsPushed) > time.Duration(dp.lg.interval)*time.Second {
+					dp.tsd_push <- dp.getStatsKey(point_time)
+					lastTimeStatsPushed = point_time
+				}
+
+				last_time_pushed = &point_time
+			}
+		case <-dp.Bye:
+			log.Printf("Datapool[%s:%d] stopped.", dp.lg.name, dp.channel_number)
+			return
 		}
-	}()
+	}
 }
 
 func (dp *datapool) pushKeys(point_time time.Time) (int, int) {
@@ -360,7 +357,7 @@ func StartDataPools(config *Config, tsd_pushers []chan []string) (dps []*datapoo
 	for _, lg := range config.logGroups {
 		for i := 0; i < lg.goroutines; i++ {
 			dp := lg.CreateDataPool(i, tsd_pushers, nb_tsd_push)
-			dp.start()
+			go dp.start()
 			dps = append(dps, dp)
 
 			nb_tsd_push = (nb_tsd_push + 1) % config.GetPusherNumber()
