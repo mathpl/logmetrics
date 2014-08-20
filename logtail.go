@@ -9,6 +9,11 @@ import (
 	"github.com/mathpl/tail"
 )
 
+type tailer struct {
+	ts tailStats
+	lg *logGroup
+}
+
 type tailStats struct {
 	line_read   int64
 	byte_read   int64
@@ -52,7 +57,7 @@ func (ts *tailStats) getTailStatsKey() []string {
 
 }
 
-func tailFile(channel_number int, filename string, lg *LogGroup, tsd_pusher chan []string) {
+func tailFile(channel_number int, filename string, lg *logGroup, tsd_pusher chan []string) {
 	tail_stats := tailStats{last_report: time.Now(), hostname: getHostname(),
 		filename: filename, log_group: lg.name, interval: lg.interval}
 
@@ -118,7 +123,7 @@ func tailFile(channel_number int, filename string, lg *LogGroup, tsd_pusher chan
 	log.Printf("Finished tailling %s.", filename)
 }
 
-func startLogGroup(logGroup *LogGroup, pollInterval int, tsd_pushers []chan []string, push_number int) {
+func startlogGroup(logGroup *logGroup, pollInterval int, tsd_pushers []chan []string, push_number int) {
 	log.Printf("Filename poller for %s started", logGroup.name)
 	log.Printf("Using the following regexp for log group %s: %s", logGroup.name, logGroup.strRegexp)
 
@@ -171,6 +176,6 @@ func startLogGroup(logGroup *LogGroup, pollInterval int, tsd_pushers []chan []st
 
 func StartTails(config *Config, tsd_pushers []chan []string) {
 	for _, logGroup := range config.logGroups {
-		go startLogGroup(logGroup, config.pollInterval, tsd_pushers, config.GetPusherNumber())
+		go startlogGroup(logGroup, config.pollInterval, tsd_pushers, config.GetPusherNumber())
 	}
 }

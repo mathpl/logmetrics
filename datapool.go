@@ -1,7 +1,6 @@
 package logmetrics
 
 import (
-	"bytes"
 	"fmt"
 	"log"
 	"sort"
@@ -35,7 +34,7 @@ type fileInfo struct {
 	last_push  time.Time
 }
 
-type DataPool struct {
+type datapool struct {
 	data          map[string]*tsdPoint
 	duplicateSent map[string]*time.Time
 	tsd_push      chan []string
@@ -46,7 +45,7 @@ type DataPool struct {
 
 	tag_order []string
 
-	lg *LogGroup
+	lg *logGroup
 
 	total_keys     int
 	total_stale    int
@@ -55,7 +54,7 @@ type DataPool struct {
 	Bye chan bool
 }
 
-func (dp *DataPool) compileTagOrder() {
+func (dp *datapool) compileTagOrder() {
 	tag_order := make([]string, dp.lg.getNbTags())
 	i := 0
 	for tagname, _ := range dp.lg.tags {
@@ -67,7 +66,7 @@ func (dp *DataPool) compileTagOrder() {
 	dp.tag_order = tag_order
 }
 
-func (dp *DataPool) extractTags(data []string) []string {
+func (dp *datapool) extractTags(data []string) []string {
 	//General tags
 	tags := make([]string, dp.lg.getNbTags())
 	for cnt, tagname := range dp.tag_order {
@@ -89,44 +88,21 @@ func build_replace_map(data []string) map[string]string {
 	return r
 }
 
-func (dp *DataPool) applyTransforms(match_groups []string) []string {
+func (dp *datapool) applyTransforms(match_groups []string) []string {
 	transformed_matches := make([]string, len(match_groups))
 
 	for pos, data := range match_groups {
 		if transform, ok := dp.lg.transform[pos]; ok {
-			for _, operation := range transform.ops {
-				got_match := false
-				switch op := operation.(type) {
-				case replace:
-					if (transform.replace_only_one && !got_match) || !transform.replace_only_one {
-						m := op.matcher.MatcherString(data, 0)
-						got_match = m.Matches()
-						if got_match {
-							var buf bytes.Buffer
-
-							replace_map := build_replace_map(m.ExtractString())
-							op.replacer.Replace(&buf, replace_map)
-							data = buf.String()
-						}
-					}
-				case match_or_default:
-					m := op.matcher.Matcher([]byte(data), 0)
-					if !m.Matches() {
-						if transform.log_default_assign {
-							log.Printf("Assigning default value to: %s", data)
-						}
-						data = op.default_val
-					}
-				}
-			}
+			transformed_matches[pos] = transform.apply(data)
+		} else {
+			transformed_matches[pos] = data
 		}
-		transformed_matches[pos] = data
 	}
 
 	return transformed_matches
 }
 
-func (dp *DataPool) getKeys(data []string) ([]dataPoint, time.Time) {
+func (dp *datapool) getKeys(data []string) ([]dataPoint, time.Time) {
 	y := time.Now().Year()
 
 	tags := dp.extractTags(data)
@@ -217,7 +193,7 @@ func (dp *DataPool) getKeys(data []string) ([]dataPoint, time.Time) {
 	return dataPoints, t
 }
 
-func (dp *DataPool) getStatsKey(timePush time.Time) []string {
+func (dp *datapool) getStatsKey(timePush time.Time) []string {
 	line := make([]string, 2)
 	line[0] = fmt.Sprintf("logmetrics_collector.data_pool.key_tracked %d %d host=%s log_group=%s log_group_number=%d", timePush.Unix(), dp.total_keys, dp.lg.hostname, dp.lg.name, dp.tsd_channel_number)
 	line[1] = fmt.Sprintf("logmetrics_collector.data_pool.key_staled %d %d host=%s log_group=%s log_group_number=%d", timePush.Unix(), dp.total_stale, dp.lg.hostname, dp.lg.name, dp.tsd_channel_number)
@@ -225,7 +201,7 @@ func (dp *DataPool) getStatsKey(timePush time.Time) []string {
 	return line
 }
 
-func (dp *DataPool) start() {
+func (dp *datapool) start() {
 	log.Printf("Datapool[%s:%d] started. Pushing keys to TsdPusher[%d]", dp.lg.name, dp.channel_number, dp.tsd_channel_number)
 
 	//Start the handler
@@ -317,7 +293,7 @@ func (dp *DataPool) start() {
 	}()
 }
 
-func (dp *DataPool) pushKeys(point_time time.Time) (int, int) {
+func (dp *datapool) pushKeys(point_time time.Time) (int, int) {
 	nbKeys := 0
 	nbStale := 0
 	for tsd_key, tsdPoint := range dp.data {
@@ -377,10 +353,10 @@ func (dp *DataPool) pushKeys(point_time time.Time) (int, int) {
 	return nbKeys, nbStale
 }
 
-func StartDataPools(config *Config, tsd_pushers []chan []string) (dps []*DataPool) {
+func StartDataPools(config *Config, tsd_pushers []chan []string) (dps []*datapool) {
 	//Start a queryHandler by log group
 	nb_tsd_push := 0
-	dps = make([]*DataPool, 0)
+	dps = make([]*datapool, 0)
 	for _, lg := range config.logGroups {
 		for i := 0; i < lg.goroutines; i++ {
 			dp := lg.CreateDataPool(i, tsd_pushers, nb_tsd_push)

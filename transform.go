@@ -1,6 +1,7 @@
 package logmetrics
 
 import (
+	"bytes"
 	"log"
 	"os"
 
@@ -40,6 +41,36 @@ func (m *match_or_default) init(regexp string, default_val string) {
 	matcher := pcre.MustCompile(regexp, 0)
 	m.matcher = &matcher
 	m.default_val = default_val
+}
+
+func (t *transform) apply(data string) string {
+	for _, operation := range t.ops {
+		got_match := false
+		switch op := operation.(type) {
+		case replace:
+			if (t.replace_only_one && !got_match) || !t.replace_only_one {
+				m := op.matcher.MatcherString(data, 0)
+				got_match = m.Matches()
+				if got_match {
+					var buf bytes.Buffer
+
+					replace_map := build_replace_map(m.ExtractString())
+					op.replacer.Replace(&buf, replace_map)
+					data = buf.String()
+				}
+			}
+		case match_or_default:
+			m := op.matcher.Matcher([]byte(data), 0)
+			if !m.Matches() {
+				if t.log_default_assign {
+					log.Printf("Assigning default value to: %s", data)
+				}
+				data = op.default_val
+			}
+		}
+	}
+
+	return data
 }
 
 func parseTransform(conf map[interface{}]interface{}) map[int]transform {

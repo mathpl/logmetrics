@@ -25,7 +25,7 @@ type Config struct {
 	stats_interval int
 	logFacility    syslog.Priority
 
-	logGroups map[string]*LogGroup
+	logGroups map[string]*logGroup
 }
 
 //type match struct {
@@ -39,7 +39,7 @@ type Config struct {
 //	return result.Matches(), ""
 //}
 
-type KeyExtract struct {
+type keyExtract struct {
 	tag         string
 	metric_type string
 	key_suffix  string
@@ -49,7 +49,7 @@ type KeyExtract struct {
 	operations map[string][]int
 }
 
-type LogGroup struct {
+type logGroup struct {
 	name              string
 	globFiles         []string
 	filename_match    string
@@ -64,7 +64,7 @@ type LogGroup struct {
 
 	key_prefix string
 	tags       map[string]int
-	metrics    map[int][]KeyExtract
+	metrics    map[int][]keyExtract
 	transform  map[int]transform
 
 	histogram_size                  int
@@ -90,11 +90,11 @@ type LogGroup struct {
 	tail_data []chan lineResult
 }
 
-func (lg *LogGroup) getNbTags() int {
+func (lg *logGroup) getNbTags() int {
 	return len(lg.tags)
 }
 
-func (lg *LogGroup) getNbKeys() int {
+func (lg *logGroup) getNbKeys() int {
 	i := 0
 	for _, metrics := range lg.metrics {
 		i += len(metrics)
@@ -114,8 +114,8 @@ func (conf *Config) GetSyslogFacility() syslog.Priority {
 	return conf.logFacility
 }
 
-func (lg *LogGroup) CreateDataPool(channel_number int, tsd_pushers []chan []string, tsd_channel_number int) *DataPool {
-	var dp DataPool
+func (lg *logGroup) CreateDataPool(channel_number int, tsd_pushers []chan []string, tsd_channel_number int) *datapool {
+	var dp datapool
 	dp.Bye = make(chan bool)
 	dp.duplicateSent = make(map[string]*time.Time)
 
@@ -166,8 +166,8 @@ func cleanSre2(log_group_name string, re string) (string, *pcre.Regexp, error) {
 	}
 }
 
-func parseMetrics(conf map[interface{}]interface{}) map[int][]KeyExtract {
-	keyExtracts := make(map[int][]KeyExtract)
+func parseMetrics(conf map[interface{}]interface{}) map[int][]keyExtract {
+	keyExtracts := make(map[int][]keyExtract)
 
 	for metric_type, metrics := range conf {
 		for _, n := range metrics.([]interface{}) {
@@ -208,7 +208,7 @@ func parseMetrics(conf map[interface{}]interface{}) map[int][]KeyExtract {
 					}
 				}
 
-				newKey := KeyExtract{tag: tag, metric_type: metric_type.(string), key_suffix: key_suffix,
+				newKey := keyExtract{tag: tag, metric_type: metric_type.(string), key_suffix: key_suffix,
 					format: format, multiply: multiply, operations: operations}
 				keyExtracts[position] = append(keyExtracts[position], newKey)
 			}
@@ -235,7 +235,7 @@ func LoadConfig(configFile string) Config {
 	settings := rawCfg.(map[interface{}]interface{})["settings"]
 
 	var cfg Config
-	cfg.logGroups = make(map[string]*LogGroup)
+	cfg.logGroups = make(map[string]*logGroup)
 
 	//Settings
 	for key, val := range settings.(map[interface{}]interface{}) {
@@ -312,7 +312,7 @@ func LoadConfig(configFile string) Config {
 			continue
 		}
 
-		var lg LogGroup
+		var lg logGroup
 
 		lg.name = name.(string)
 		lg.tags = make(map[string]int)
