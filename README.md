@@ -345,7 +345,7 @@ Channels are a way to communicate between goroutines that's safer and easier to 
 
 
 <h2>Compiling</h2>
-Since I moved away from the default regex package in favor of libpcre (for a vast performance improvement) compiling logmetrics_collector for deplyoment is a little more tricky than your average Go project. You will need libpcre-devel version 8+. Included under utils is the specfile used to build a logmetrics_collector rpm. Follow it and you should be able to statically link the libpcre of you choice.
+Since I moved away from the default regex package in favor of libpcre (for a vast performance improvement) compiling logmetrics_collector for deployment is a little more tricky than your average Go project. You will need libpcre-devel version 8+. Included under utils is the specfile used to build a logmetrics_collector rpm. Follow it and you should be able to statically link the libpcre of your choice.
 
 
 <h2>Todo</h2>
