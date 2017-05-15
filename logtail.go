@@ -83,21 +83,43 @@ func (t *tailer) tailFile() {
 
 	loc := tail.SeekInfo{0, seekParam}
 
-	tail, err := tail.TailFile(t.filename, tail.Config{Location: &loc, Follow: true, ReOpen: true, Poll: t.lg.poll_file})
+	maxLineSize := 2048
+
+	tail, err := tail.TailFile(t.filename, tail.Config{Location: &loc, Follow: true, ReOpen: true, Poll: t.lg.poll_file, MaxLineSize: maxLineSize})
+
 	if err != nil {
 		log.Fatalf("Unable to tail %s: %s", t.filename, err)
 		return
 	}
 	log.Printf("Tailing %s data to datapool[%s:%d]", t.filename, t.lg.name, t.channel_number)
 
+	line_overflow := false
+
 	//FIXME: Bug in ActiveTail can get partial lines
 	for {
 		select {
-		case line := <-tail.Lines:
-			if line.Err != nil {
-				log.Printf("Tail on %s was lost: %s", t.filename, err)
+		case line, ok := <-tail.Lines:
+			if !ok {
+				err := tail.Err()
+				if err != nil {
+					log.Printf("Tail on %s ended with error: %v", t.filename, err)
+				} else {
+					log.Printf("Tail on %s ended early", t.filename)
+				}
 				return
 			}
+			if line == nil {
+				log.Printf("tail.Lines on %s returned nil; not possible", t.filename)
+				continue
+			}
+
+			//Support to skip very long lines
+			if line_overflow {
+				line_overflow = (len(line.Text) == maxLineSize)
+				continue
+			}
+
+			line_overflow = (len(line.Text) == maxLineSize)
 
 			//Test out all the regexp, pick the first one that matches
 			match_one := false
