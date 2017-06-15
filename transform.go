@@ -20,7 +20,7 @@ type replace struct {
 	str      string
 	repl     []byte
 	matcher  *pcre.Regexp
-	replacer *replacer.Replacer
+	replacer replacer.Replacer
 }
 
 type match_or_default struct {
