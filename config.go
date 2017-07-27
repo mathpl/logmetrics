@@ -63,7 +63,7 @@ type logGroup struct {
 	date_format   string
 
 	key_prefix string
-	tags       map[string]int
+	tags       map[string]interface{}
 	metrics    map[int][]keyExtract
 	transform  map[int]transform
 
@@ -315,7 +315,7 @@ func LoadConfig(configFile string) Config {
 		var lg logGroup
 
 		lg.name = name.(string)
-		lg.tags = make(map[string]int)
+		lg.tags = make(map[string]interface{})
 
 		//Process content
 		for key, val := range group_content.(map[interface{}]interface{}) {
@@ -413,7 +413,12 @@ func LoadConfig(configFile string) Config {
 				switch key {
 				case "tags":
 					for tag, pos := range v {
-						lg.tags[tag.(string)] = pos.(int)
+                                                switch pos.(type) {
+                                                   case int:
+						      lg.tags[tag.(string)] = pos.(int)
+                                                   case string:
+                                                      lg.tags[tag.(string)] = pos.(string)
+                                                }
 					}
 
 				case "metrics":

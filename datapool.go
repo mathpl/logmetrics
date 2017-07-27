@@ -70,9 +70,18 @@ func (dp *datapool) extractTags(data []string) []string {
 	//General tags
 	tags := make([]string, dp.lg.getNbTags())
 	for cnt, tagname := range dp.tag_order {
-		//for tagname, position := range dp.lg.tags {
-		position := dp.lg.tags[tagname]
-		tags[cnt] = fmt.Sprintf("%s=%s", tagname, data[position])
+
+		tag_value := ""
+		pos_or_value := dp.lg.tags[tagname]
+
+		switch pos_or_string := pos_or_value.(type) {
+			case int:
+				tag_value = data[pos_or_string]
+			case string:
+				tag_value = pos_or_string
+		}
+
+		tags[cnt] = fmt.Sprintf("%s=%s", tagname, tag_value)
 	}
 
 	return tags
