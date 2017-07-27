@@ -419,7 +419,7 @@ func LoadConfig(configFile string) Config {
 							case string:
 								lg.tags[tag.(string)] = pos.(string)
 							default:
-								log.Fatal("Unexpected type for tags section, key %s: %T", tag, post)
+								log.Fatalf("Unexpected type for tags section, key %s: %T", tag, pos)
 							}
 					}
 
