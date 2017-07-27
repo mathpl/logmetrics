@@ -413,12 +413,14 @@ func LoadConfig(configFile string) Config {
 				switch key {
 				case "tags":
 					for tag, pos := range v {
-                                                switch pos.(type) {
-                                                   case int:
-						      lg.tags[tag.(string)] = pos.(int)
-                                                   case string:
-                                                      lg.tags[tag.(string)] = pos.(string)
-                                                }
+						switch pos.(type) {
+							case int:
+								lg.tags[tag.(string)] = pos.(int)
+							case string:
+								lg.tags[tag.(string)] = pos.(string)
+							default:
+								log.Fatal("Unexpected type for tags section, key %s: %T", tag, post)
+							}
 					}
 
 				case "metrics":
