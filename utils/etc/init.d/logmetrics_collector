@@ -44,7 +44,7 @@ sanity_check() {
   done
 
   if [ -z "$LOGMETRICS_USER" ]; then
-    echo >&2 "error: No \$USER set"
+    echo >&2 "error: No \$LOGMETRICS_USER set"
     return 4
   fi
 }
