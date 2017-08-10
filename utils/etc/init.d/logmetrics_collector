@@ -44,7 +44,7 @@ sanity_check() {
   done
 
   if [ -z "$LOGMETRICS_USER" ]; then
-    echo >&2 "error: No \$USER set"
+    echo >&2 "error: No \$LOGMETRICS_USER set"
     return 4
   fi
 }
@@ -63,6 +63,9 @@ start() {
   #Perl to the rescue, drop privileges before starting.
   nohup perl -e "(undef, undef, \$uid, \$gid ) = getpwnam('$LOGMETRICS_USER');
     $)=\$gid;$>=\$uid;
+    close(STDOUT); close(STDERR); close(STDIN);
+    open(LOG,'|/usr/bin/logger -p daemon.info -t logmetrics_collector -i');
+    open(STDOUT, '>&LOG'); open(STDERR, '>&LOG');
     exec '$LOGMETRICS_COLLECTOR $LOGMETRICS_OPTIONS';" 2>&1 >/dev/null &
 
   PID=$!
