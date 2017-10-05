@@ -14,6 +14,7 @@ import (
 type dataPoint struct {
 	name        string
 	value       int64
+	never_stale bool
 	metric_type string
 }
 
@@ -27,6 +28,7 @@ type tsdPoint struct {
 	filename           string
 	last_push          time.Time
 	last_crunched_push time.Time
+	never_stale        bool
 }
 
 type fileInfo struct {
@@ -204,7 +206,7 @@ func (dp *datapool) getKeys(data []string) ([]dataPoint, time.Time) {
 				return nil, nt
 			}
 
-			dataPoints[i] = dataPoint{name: key, value: val, metric_type: keyType.metric_type}
+			dataPoints[i] = dataPoint{name: key, value: val, metric_type: keyType.metric_type, never_stale: keyType.never_stale}
 			i++
 		}
 	}
@@ -273,6 +275,7 @@ func (dp *datapool) start() {
 
 				dp.data[data_point.name].data.Update(point_time, data_point.value)
 				dp.data[data_point.name].filename = line_result.filename
+				dp.data[data_point.name].never_stale = data_point.never_stale
 			}
 
 			//Support for log playback - Push when <interval> has pass in the logs, not real time
@@ -316,7 +319,7 @@ func (dp *datapool) pushKeys(point_time time.Time) (int, int) {
 		pointData := tsdPoint.data
 		currentFileInfo := dp.last_time_file[tsdPoint.filename]
 
-		if dp.lg.stale_removal && pointData.Stale(point_time) {
+		if dp.lg.stale_removal && pointData.Stale(point_time) && !tsdPoint.never_stale {
 			if dp.lg.log_stale_metrics {
 				log.Printf("Deleting stale metric. Last update: %s Current time: %s Metric: %s", pointData.GetMaxTime(), point_time, tsd_key)
 			}
