@@ -75,10 +75,10 @@ func (dp *datapool) extractTags(data []string) []string {
 		pos_or_value := dp.lg.tags[tagname]
 
 		switch pos_or_string := pos_or_value.(type) {
-			case int:
-				tag_value = data[pos_or_string]
-			case string:
-				tag_value = pos_or_string
+		case int:
+			tag_value = data[pos_or_string]
+		case string:
+			tag_value = pos_or_string
 		}
 
 		tags[cnt] = fmt.Sprintf("%s=%s", tagname, tag_value)
@@ -145,11 +145,21 @@ func (dp *datapool) getKeys(data []string) ([]dataPoint, time.Time) {
 				if keyType.format == "float" {
 					var val_float float64
 					if val_float, err = strconv.ParseFloat(data[position], 64); err == nil {
-						val = int64(val_float * float64(keyType.multiply))
+						if keyType.multiply > 1 {
+							val = int64(val_float * float64(keyType.multiply))
+						}
+						if keyType.divide > 1 {
+							val = int64(val_float / float64(keyType.divide))
+						}
 					}
 				} else {
 					if val, err = strconv.ParseInt(data[position], 10, 64); err == nil {
-						val = val * int64(keyType.multiply)
+						if keyType.multiply > 1 {
+							val = val * int64(keyType.multiply)
+						}
+						if keyType.divide > 1 {
+							val = val / int64(keyType.divide)
+						}
 					}
 				}
 

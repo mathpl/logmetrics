@@ -45,6 +45,7 @@ type keyExtract struct {
 	key_suffix  string
 	format      string
 	multiply    int
+	divide      int
 
 	operations map[string][]int
 }
@@ -177,6 +178,8 @@ func parseMetrics(conf map[interface{}]interface{}) map[int][]keyExtract {
 
 			var format string
 			var multiply int
+			var divide int
+
 			if format_key, ok := m["format"]; ok == true {
 				format = format_key.(string)
 			} else {
@@ -186,6 +189,11 @@ func parseMetrics(conf map[interface{}]interface{}) map[int][]keyExtract {
 				multiply = multiply_key.(int)
 			} else {
 				multiply = 1
+			}
+			if divide_key, ok := m["divide"]; ok == true {
+				divide = divide_key.(int)
+			} else {
+				divide = 1
 			}
 
 			for _, val := range m["reference"].([]interface{}) {
@@ -209,7 +217,7 @@ func parseMetrics(conf map[interface{}]interface{}) map[int][]keyExtract {
 				}
 
 				newKey := keyExtract{tag: tag, metric_type: metric_type.(string), key_suffix: key_suffix,
-					format: format, multiply: multiply, operations: operations}
+					format: format, multiply: multiply, divide: divide, operations: operations}
 				keyExtracts[position] = append(keyExtracts[position], newKey)
 			}
 		}
@@ -414,13 +422,13 @@ func LoadConfig(configFile string) Config {
 				case "tags":
 					for tag, pos := range v {
 						switch pos.(type) {
-							case int:
-								lg.tags[tag.(string)] = pos.(int)
-							case string:
-								lg.tags[tag.(string)] = pos.(string)
-							default:
-								log.Fatalf("Unexpected type for tags section, key %s: %T", tag, pos)
-							}
+						case int:
+							lg.tags[tag.(string)] = pos.(int)
+						case string:
+							lg.tags[tag.(string)] = pos.(string)
+						default:
+							log.Fatalf("Unexpected type for tags section, key %s: %T", tag, pos)
+						}
 					}
 
 				case "metrics":
