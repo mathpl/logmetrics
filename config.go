@@ -44,7 +44,9 @@ type keyExtract struct {
 	metric_type string
 	key_suffix  string
 	format      string
+	never_stale bool
 	multiply    int
+	divide      int
 
 	operations map[string][]int
 }
@@ -177,6 +179,9 @@ func parseMetrics(conf map[interface{}]interface{}) map[int][]keyExtract {
 
 			var format string
 			var multiply int
+			var divide int
+			var never_stale bool
+
 			if format_key, ok := m["format"]; ok == true {
 				format = format_key.(string)
 			} else {
@@ -184,8 +189,24 @@ func parseMetrics(conf map[interface{}]interface{}) map[int][]keyExtract {
 			}
 			if multiply_key, ok := m["multiply"]; ok == true {
 				multiply = multiply_key.(int)
+				if multiply == 0 {
+					log.Fatalf("A 'multiply' transform cannot be zero")
+				}
 			} else {
 				multiply = 1
+			}
+			if divide_key, ok := m["divide"]; ok == true {
+				divide = divide_key.(int)
+				if divide < 1 {
+					log.Fatalf("A 'divide' transform cannot be zero")
+				}
+			} else {
+				divide = 1
+			}
+			if never_stale_key, ok := m["never_stale"]; ok == true {
+				never_stale = never_stale_key.(bool)
+			} else {
+				never_stale = false
 			}
 
 			for _, val := range m["reference"].([]interface{}) {
@@ -209,7 +230,7 @@ func parseMetrics(conf map[interface{}]interface{}) map[int][]keyExtract {
 				}
 
 				newKey := keyExtract{tag: tag, metric_type: metric_type.(string), key_suffix: key_suffix,
-					format: format, multiply: multiply, operations: operations}
+					format: format, multiply: multiply, divide: divide, never_stale: never_stale, operations: operations}
 				keyExtracts[position] = append(keyExtracts[position], newKey)
 			}
 		}
@@ -414,13 +435,13 @@ func LoadConfig(configFile string) Config {
 				case "tags":
 					for tag, pos := range v {
 						switch pos.(type) {
-							case int:
-								lg.tags[tag.(string)] = pos.(int)
-							case string:
-								lg.tags[tag.(string)] = pos.(string)
-							default:
-								log.Fatalf("Unexpected type for tags section, key %s: %T", tag, pos)
-							}
+						case int:
+							lg.tags[tag.(string)] = pos.(int)
+						case string:
+							lg.tags[tag.(string)] = pos.(string)
+						default:
+							log.Fatalf("Unexpected type for tags section, key %s: %T", tag, pos)
+						}
 					}
 
 				case "metrics":
