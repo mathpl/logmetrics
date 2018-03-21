@@ -119,7 +119,7 @@ func (conf *Config) GetSyslogFacility() syslog.Priority {
 func (lg *logGroup) CreateDataPool(channel_number int, tsd_pushers []chan []string, tsd_channel_number int) *datapool {
 	var dp datapool
 	dp.Bye = make(chan bool)
-	dp.duplicateSent = make(map[string]time.Time)
+	dp.duplicateSent = make(map[string]*time.Time)
 
 	dp.channel_number = channel_number
 	dp.tail_data = lg.tail_data[channel_number]
