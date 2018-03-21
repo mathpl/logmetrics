@@ -38,7 +38,7 @@ type fileInfo struct {
 
 type datapool struct {
 	data          map[string]*tsdPoint
-	duplicateSent map[string]time.Time
+	duplicateSent map[string]*time.Time
 	tsd_push      chan []string
 	tail_data     chan lineResult
 
@@ -332,7 +332,6 @@ func (dp *datapool) pushKeys(point_time time.Time) (int, int) {
 			nbKeys += pointData.NbKeys()
 		}
 
-		// pointData.lastUpdate.After(tsdPoint.last_push)
 		updateToSend := pointData.PushKeysTime(tsdPoint.last_push)
 
 		var keys []string
@@ -340,18 +339,27 @@ func (dp *datapool) pushKeys(point_time time.Time) (int, int) {
 			tsdPoint.last_push = pointData.GetMaxTime()
 			currentFileInfo.last_push = tsdPoint.last_push
 
-			// always take the log file timestamp
-			keys = pointData.GetKeys(point_time, tsd_key, false)
-		} else if !updateToSend && dp.lg.send_duplicates {
-			var dup_time time.Time
-			if _,ok := dp.duplicateSent[tsd_key]; ok {
-				dup_time = dp.duplicateSent[tsd_key].Add((time.Second * time.Duration(dp.lg.interval)))
-			} else {
-				dup_time = pointData.GetMaxTime().Add((time.Second * time.Duration(dp.lg.interval)))
-			}
+			// When sending duplicate use the current time instead of the last updated time of the metric.
+			keys = pointData.GetKeys(point_time, tsd_key, dp.lg.live_poll)
+		}
 
-			dp.duplicateSent[tsd_key] = dup_time
-			keys = pointData.GetKeys(dup_time, tsd_key, true)
+		if dp.lg.send_duplicates {
+			if !updateToSend {
+				//previous_time := point_time.Add(-(time.Second * time.Duration(dp.lg.interval)))
+				//	if dp.duplicateSent[tsd_key] != nil && previous_time.After(*dp.duplicateSent[tsd_key]) {
+				//		// This key has had a duplicate sent already
+				//		// There is a new update, send a duplicate from -<interval> to get a good graph
+				//		dupKeys := pointData.GetKeys(previous_time, tsd_key, dp.lg.send_duplicates)
+				//		keys = append(dupKeys, keys[:]...)
+				//		dp.duplicateSent[tsd_key] = nil
+				//		log.Printf("%+V", keys)
+				//	}
+				//} else if dp.duplicateSent[tsd_key] == nil {
+				//} else {
+				// No duplicate has been sent already
+				keys = pointData.GetKeys(point_time, tsd_key, true)
+				dp.duplicateSent[tsd_key] = &point_time
+			}
 		}
 
 		dp.tsd_push <- keys
